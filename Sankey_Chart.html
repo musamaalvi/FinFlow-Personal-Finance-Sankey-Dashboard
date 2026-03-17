@@ -1,0 +1,1423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transaction Sankey</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#1A1A2E; color:#fff; font-family:Arial,sans-serif; }
+header { background:#0F3460; padding:20px 32px; display:flex; align-items:center; gap:16px; border-bottom:2px solid #E94560; }
+header h1 { font-size:22px; font-weight:700; }
+#pl { font-size:13px; color:#90CAF9; margin-left:auto; }
+.controls { background:#16213E; padding:16px 32px; display:flex; gap:16px; align-items:center; flex-wrap:wrap; border-bottom:1px solid #0F3460; }
+.controls label { font-size:13px; color:#90CAF9; font-weight:600; }
+.controls select { background:#0F3460; color:#fff; border:1px solid #E94560; border-radius:6px; padding:8px 14px; font-size:13px; cursor:pointer; outline:none; }
+.stats { background:#16213E; padding:12px 32px; display:flex; gap:24px; flex-wrap:wrap; border-bottom:1px solid #0F3460; }
+.sc { background:#0F3460; border-radius:8px; padding:12px 20px; min-width:140px; border-left:3px solid #E94560; }
+.sc.inc { border-left-color:#06D6A0; } .sc.exp { border-left-color:#E94560; }
+.sc.np  { border-left-color:#4CC9F0; } .sc.nn  { border-left-color:#FF6B35; }
+.sl { font-size:11px; color:#90CAF9; text-transform:uppercase; letter-spacing:.5px; }
+.sv { font-size:20px; font-weight:700; margin-top:4px; }
+.sv.iv { color:#06D6A0; } .sv.ev { color:#E94560; } .sv.pv { color:#4CC9F0; } .sv.nv { color:#FF6B35; } .sv.cv { color:#c084fc; }
+.cat-panel { background:#16213E; padding:14px 32px; border-bottom:1px solid #0F3460; }
+.cat-panel-header { display:flex; align-items:center; gap:16px; margin-bottom:10px; }
+.cat-panel-header span { font-size:13px; color:#90CAF9; font-weight:600; }
+.cat-toggle-btn { background:none; border:1px solid #0F3460; color:#90CAF9; border-radius:5px; padding:4px 10px; font-size:11px; cursor:pointer; }
+.cat-toggle-btn:hover { border-color:#E94560; color:#fff; }
+.cat-chips { display:flex; flex-wrap:wrap; gap:8px; }
+.chip { display:flex; align-items:center; gap:6px; padding:5px 12px 5px 8px; border-radius:20px; font-size:12px; font-weight:600; cursor:pointer; border:2px solid transparent; user-select:none; transition: opacity .15s, border-color .15s; }
+.chip .cdot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+.chip.off { opacity:0.35; border-color:transparent; }
+.chip.on { opacity:1; border-color:rgba(255,255,255,0.25); }
+#cc { padding:24px 32px; overflow-x:auto; }
+#sg { background:#16213E; border-radius:12px; border:1px solid #0F3460; display:block; min-width:600px; }
+.tip { position:fixed; background:rgba(15,52,96,.97); border:1px solid #E94560; border-radius:8px; padding:10px 16px; font-size:13px; pointer-events:none; display:none; z-index:999; max-width:240px; box-shadow:0 4px 20px rgba(0,0,0,.5); }
+.tip strong { color:#E94560; display:block; margin-bottom:4px; } .tip span { color:#e0e0e0; }
+.leg { padding:0 32px 16px; display:flex; flex-wrap:wrap; gap:10px; }
+.li { display:flex; align-items:center; gap:6px; background:#16213E; border-radius:6px; padding:6px 12px; font-size:12px; }
+.ld { width:12px; height:12px; border-radius:3px; flex-shrink:0; }
+#txn-panel { margin:0 32px 40px; border-radius:12px; overflow:hidden; border:1px solid #0F3460; display:none; }
+#txn-header { display:flex; align-items:center; justify-content:space-between; padding:14px 20px; background:#0F3460; }
+#txn-title { font-size:15px; font-weight:700; }
+#txn-title span { font-size:12px; font-weight:400; color:#90CAF9; margin-left:10px; }
+#txn-close { background:none; border:1px solid #E94560; color:#E94560; border-radius:5px; padding:4px 12px; font-size:12px; cursor:pointer; }
+#txn-close:hover { background:#E94560; color:#fff; }
+#txn-search-bar { background:#16213E; padding:10px 20px; border-bottom:1px solid #0F3460; }
+#txn-search { background:#0F3460; border:1px solid #0F3460; color:#fff; border-radius:6px; padding:7px 14px; font-size:13px; width:280px; outline:none; }
+#txn-search:focus { border-color:#E94560; }
+#txn-search::placeholder { color:#4a6fa5; }
+#txn-table-wrap { overflow-x:auto; max-height:420px; overflow-y:auto; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+thead th { background:#0a2440; color:#90CAF9; font-size:11px; text-transform:uppercase; letter-spacing:.5px; padding:10px 16px; text-align:left; position:sticky; top:0; z-index:2; }
+thead th.num { text-align:right; }
+tbody tr { border-bottom:1px solid #0F3460; transition:background .1s; }
+tbody tr:hover { background:#1e3a5f; }
+tbody td { padding:10px 16px; color:#e0e0e0; }
+tbody td.num { text-align:right; color:#E94560; font-weight:600; font-variant-numeric:tabular-nums; }
+tbody td.date { color:#90CAF9; white-space:nowrap; }
+tbody td.merchant { font-weight:600; color:#fff; max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+tbody td.desc { color:#aab4c8; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cat-badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; color:#fff; }
+#txn-footer { background:#0a2440; padding:10px 20px; font-size:12px; color:#90CAF9; display:flex; gap:24px; }
+#txn-footer strong { color:#fff; }
+</style>
+</head>
+<body>
+<header><span>&#127754;</span><h1>Income Flow &mdash; Transaction Sankey</h1><span id="pl">All Time</span></header>
+<div class="controls">
+  <label>Year:</label><select id="ys"><option value="all">All Years</option></select>
+  <label>Month:</label>
+  <select id="ms">
+    <option value="all">All Months</option>
+    <option>Jan</option><option>Feb</option><option>Mar</option><option>Apr</option>
+    <option>May</option><option>Jun</option><option>Jul</option><option>Aug</option>
+    <option>Sep</option><option>Oct</option><option>Nov</option><option>Dec</option>
+  </select>
+</div>
+<div class="cat-panel">
+  <div class="cat-panel-header">
+    <span>&#127991; Categories</span>
+    <button class="cat-toggle-btn" id="btn-all">Select All</button>
+    <button class="cat-toggle-btn" id="btn-none">Deselect All</button>
+  </div>
+  <div class="cat-chips" id="chips"></div>
+</div>
+<div class="stats">
+  <div class="sc inc"><div class="sl">Total Income</div><div class="sv iv" id="si">-</div></div>
+  <div class="sc exp"><div class="sl">Total Spent</div><div class="sv ev" id="se">-</div></div>
+  <div class="sc" id="nc"><div class="sl">Net Savings</div><div class="sv" id="sn">-</div></div>
+  <div class="sc" style="border-left-color:#7B2D8B"><div class="sl">Coverage</div><div class="sv cv" id="scov">-</div></div>
+</div>
+<div id="cc"><svg id="sg"></svg></div>
+<div class="leg" id="leg"></div>
+<div id="txn-panel">
+  <div id="txn-header">
+    <div id="txn-title">Transactions</div>
+    <button id="txn-close">&#10005; Close</button>
+  </div>
+  <div id="txn-search-bar" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <input id="txn-search" type="text" placeholder="Search merchant or description...">
+    <button class="cat-toggle-btn" id="txn-sel-all">Select All</button>
+    <button class="cat-toggle-btn" id="txn-sel-none">Deselect All</button>
+    <span id="txn-sel-hint" style="font-size:11px;color:#4a6fa5;margin-left:4px;">Deselected transactions are excluded from the chart</span>
+  </div>
+  <div id="txn-table-wrap">
+    <table>
+      <thead><tr>
+        <th style="width:36px;text-align:center;"><input type="checkbox" id="chk-all" checked title="Select all visible"></th>
+        <th>Date</th><th>Merchant</th><th>Description</th><th class="num">Amount</th>
+      </tr></thead>
+      <tbody id="txn-body"></tbody>
+    </table>
+  </div>
+  <div id="txn-footer">
+    <div>Showing <strong id="txn-count">0</strong> transactions</div>
+    <div>Selected total: <strong id="txn-total">-</strong></div>
+    <div id="txn-excl-msg" style="color:#E94560;display:none;">&#9888; Some transactions excluded from chart</div>
+  </div>
+</div>
+<div class="tip" id="tip"></div>
+<script>
+var RAW  = [
+{"from": "Income", "to": "Bills", "amount": 329.9, "year": 2023, "month": "Jan", "monthYear": "Jan 2023", "income_ref": 3111.54},
+{"from": "Income", "to": "Charity", "amount": 11.49, "year": 2023, "month": "Jan", "monthYear": "Jan 2023", "income_ref": 3111.54},
+{"from": "Income", "to": "Eating Out", "amount": 37.9, "year": 2023, "month": "Jan", "monthYear": "Jan 2023", "income_ref": 3111.54},
+{"from": "Income", "to": "Entertainment", "amount": 51.97, "year": 2023, "month": "Jan", "monthYear": "Jan 2023", "income_ref": 3111.54},
+{"from": "Income", "to": "Groceries", "amount": 217.96999999999997, "year": 2023, "month": "Jan", "monthYear": "Jan 2023", "income_ref": 3111.54},
+{"from": "Income", "to": "Health & Beauty", "amount": 49.019999999999996, "year": 2023, "month": "Jan", "monthYear": "Jan 2023", "income_ref": 3111.54},
+{"from": "Income", "to": "Home & Family", "amount": 1000.54, "year": 2023, "month": "Jan", "monthYear": "Jan 2023", "income_ref": 3111.54},
+{"from": "Income", "to": "Investment", "amount": 212.93, "year": 2023, "month": "Jan", "monthYear": "Jan 2023", "income_ref": 3111.54},
+{"from": "Income", "to": "Shopping", "amount": 225.17, "year": 2023, "month": "Jan", "monthYear": "Jan 2023", "income_ref": 3111.54},
+{"from": "Income", "to": "Transport", "amount": 124.63000000000001, "year": 2023, "month": "Jan", "monthYear": "Jan 2023", "income_ref": 3111.54},
+{"from": "Income", "to": "Bills", "amount": 341.33, "year": 2023, "month": "Feb", "monthYear": "Feb 2023", "income_ref": 2644.75},
+{"from": "Income", "to": "Eating Out", "amount": 76.67999999999999, "year": 2023, "month": "Feb", "monthYear": "Feb 2023", "income_ref": 2644.75},
+{"from": "Income", "to": "Entertainment", "amount": 51.97, "year": 2023, "month": "Feb", "monthYear": "Feb 2023", "income_ref": 2644.75},
+{"from": "Income", "to": "Groceries", "amount": 269.88, "year": 2023, "month": "Feb", "monthYear": "Feb 2023", "income_ref": 2644.75},
+{"from": "Income", "to": "Health & Beauty", "amount": 24.99, "year": 2023, "month": "Feb", "monthYear": "Feb 2023", "income_ref": 2644.75},
+{"from": "Income", "to": "Home & Family", "amount": 1041.45, "year": 2023, "month": "Feb", "monthYear": "Feb 2023", "income_ref": 2644.75},
+{"from": "Income", "to": "Investment", "amount": 186.99, "year": 2023, "month": "Feb", "monthYear": "Feb 2023", "income_ref": 2644.75},
+{"from": "Income", "to": "Shopping", "amount": 239.67, "year": 2023, "month": "Feb", "monthYear": "Feb 2023", "income_ref": 2644.75},
+{"from": "Income", "to": "Transport", "amount": 257.26, "year": 2023, "month": "Feb", "monthYear": "Feb 2023", "income_ref": 2644.75},
+{"from": "Income", "to": "Bills", "amount": 342.28999999999996, "year": 2023, "month": "Mar", "monthYear": "Mar 2023", "income_ref": 2689.49},
+{"from": "Income", "to": "Charity", "amount": 15.73, "year": 2023, "month": "Mar", "monthYear": "Mar 2023", "income_ref": 2689.49},
+{"from": "Income", "to": "Eating Out", "amount": 143.78, "year": 2023, "month": "Mar", "monthYear": "Mar 2023", "income_ref": 2689.49},
+{"from": "Income", "to": "Entertainment", "amount": 51.97, "year": 2023, "month": "Mar", "monthYear": "Mar 2023", "income_ref": 2689.49},
+{"from": "Income", "to": "Groceries", "amount": 403.91999999999996, "year": 2023, "month": "Mar", "monthYear": "Mar 2023", "income_ref": 2689.49},
+{"from": "Income", "to": "Health & Beauty", "amount": 24.99, "year": 2023, "month": "Mar", "monthYear": "Mar 2023", "income_ref": 2689.49},
+{"from": "Income", "to": "Home & Family", "amount": 1056.8600000000001, "year": 2023, "month": "Mar", "monthYear": "Mar 2023", "income_ref": 2689.49},
+{"from": "Income", "to": "Investment", "amount": 229.15, "year": 2023, "month": "Mar", "monthYear": "Mar 2023", "income_ref": 2689.49},
+{"from": "Income", "to": "Shopping", "amount": 105.21, "year": 2023, "month": "Mar", "monthYear": "Mar 2023", "income_ref": 2689.49},
+{"from": "Income", "to": "Transport", "amount": 184.27999999999997, "year": 2023, "month": "Mar", "monthYear": "Mar 2023", "income_ref": 2689.49},
+{"from": "Income", "to": "Bills", "amount": 340.06, "year": 2023, "month": "Apr", "monthYear": "Apr 2023", "income_ref": 3299.59},
+{"from": "Income", "to": "Eating Out", "amount": 54.870000000000005, "year": 2023, "month": "Apr", "monthYear": "Apr 2023", "income_ref": 3299.59},
+{"from": "Income", "to": "Entertainment", "amount": 51.97, "year": 2023, "month": "Apr", "monthYear": "Apr 2023", "income_ref": 3299.59},
+{"from": "Income", "to": "Groceries", "amount": 282.89, "year": 2023, "month": "Apr", "monthYear": "Apr 2023", "income_ref": 3299.59},
+{"from": "Income", "to": "Health & Beauty", "amount": 24.99, "year": 2023, "month": "Apr", "monthYear": "Apr 2023", "income_ref": 3299.59},
+{"from": "Income", "to": "Home & Family", "amount": 1098.9, "year": 2023, "month": "Apr", "monthYear": "Apr 2023", "income_ref": 3299.59},
+{"from": "Income", "to": "Investment", "amount": 297.8, "year": 2023, "month": "Apr", "monthYear": "Apr 2023", "income_ref": 3299.59},
+{"from": "Income", "to": "Shopping", "amount": 123.13, "year": 2023, "month": "Apr", "monthYear": "Apr 2023", "income_ref": 3299.59},
+{"from": "Income", "to": "Transport", "amount": 190.1, "year": 2023, "month": "Apr", "monthYear": "Apr 2023", "income_ref": 3299.59},
+{"from": "Income", "to": "Bills", "amount": 336.3, "year": 2023, "month": "May", "monthYear": "May 2023", "income_ref": 3346.61},
+{"from": "Income", "to": "Eating Out", "amount": 123.07, "year": 2023, "month": "May", "monthYear": "May 2023", "income_ref": 3346.61},
+{"from": "Income", "to": "Entertainment", "amount": 51.97, "year": 2023, "month": "May", "monthYear": "May 2023", "income_ref": 3346.61},
+{"from": "Income", "to": "Groceries", "amount": 259.79, "year": 2023, "month": "May", "monthYear": "May 2023", "income_ref": 3346.61},
+{"from": "Income", "to": "Health & Beauty", "amount": 24.99, "year": 2023, "month": "May", "monthYear": "May 2023", "income_ref": 3346.61},
+{"from": "Income", "to": "Home & Family", "amount": 1016.34, "year": 2023, "month": "May", "monthYear": "May 2023", "income_ref": 3346.61},
+{"from": "Income", "to": "Investment", "amount": 261.36, "year": 2023, "month": "May", "monthYear": "May 2023", "income_ref": 3346.61},
+{"from": "Income", "to": "Shopping", "amount": 166.1, "year": 2023, "month": "May", "monthYear": "May 2023", "income_ref": 3346.61},
+{"from": "Income", "to": "Transport", "amount": 144.2, "year": 2023, "month": "May", "monthYear": "May 2023", "income_ref": 3346.61},
+{"from": "Income", "to": "Bills", "amount": 336.24, "year": 2023, "month": "Jun", "monthYear": "Jun 2023", "income_ref": 2813.44},
+{"from": "Income", "to": "Eating Out", "amount": 172.47000000000003, "year": 2023, "month": "Jun", "monthYear": "Jun 2023", "income_ref": 2813.44},
+{"from": "Income", "to": "Entertainment", "amount": 51.97, "year": 2023, "month": "Jun", "monthYear": "Jun 2023", "income_ref": 2813.44},
+{"from": "Income", "to": "Groceries", "amount": 296.59000000000003, "year": 2023, "month": "Jun", "monthYear": "Jun 2023", "income_ref": 2813.44},
+{"from": "Income", "to": "Health & Beauty", "amount": 66.14, "year": 2023, "month": "Jun", "monthYear": "Jun 2023", "income_ref": 2813.44},
+{"from": "Income", "to": "Home & Family", "amount": 1080.33, "year": 2023, "month": "Jun", "monthYear": "Jun 2023", "income_ref": 2813.44},
+{"from": "Income", "to": "Investment", "amount": 246.22, "year": 2023, "month": "Jun", "monthYear": "Jun 2023", "income_ref": 2813.44},
+{"from": "Income", "to": "Shopping", "amount": 231.43, "year": 2023, "month": "Jun", "monthYear": "Jun 2023", "income_ref": 2813.44},
+{"from": "Income", "to": "Transport", "amount": 308.94999999999993, "year": 2023, "month": "Jun", "monthYear": "Jun 2023", "income_ref": 2813.44},
+{"from": "Income", "to": "Travel", "amount": 224.24, "year": 2023, "month": "Jun", "monthYear": "Jun 2023", "income_ref": 2813.44},
+{"from": "Income", "to": "Bills", "amount": 344.96, "year": 2023, "month": "Jul", "monthYear": "Jul 2023", "income_ref": 3254.74},
+{"from": "Income", "to": "Eating Out", "amount": 87.3, "year": 2023, "month": "Jul", "monthYear": "Jul 2023", "income_ref": 3254.74},
+{"from": "Income", "to": "Entertainment", "amount": 51.97, "year": 2023, "month": "Jul", "monthYear": "Jul 2023", "income_ref": 3254.74},
+{"from": "Income", "to": "Groceries", "amount": 303.09999999999997, "year": 2023, "month": "Jul", "monthYear": "Jul 2023", "income_ref": 3254.74},
+{"from": "Income", "to": "Health & Beauty", "amount": 33.42, "year": 2023, "month": "Jul", "monthYear": "Jul 2023", "income_ref": 3254.74},
+{"from": "Income", "to": "Home & Family", "amount": 1038.61, "year": 2023, "month": "Jul", "monthYear": "Jul 2023", "income_ref": 3254.74},
+{"from": "Income", "to": "Investment", "amount": 224.16, "year": 2023, "month": "Jul", "monthYear": "Jul 2023", "income_ref": 3254.74},
+{"from": "Income", "to": "Shopping", "amount": 165.93, "year": 2023, "month": "Jul", "monthYear": "Jul 2023", "income_ref": 3254.74},
+{"from": "Income", "to": "Transport", "amount": 215.8, "year": 2023, "month": "Jul", "monthYear": "Jul 2023", "income_ref": 3254.74},
+{"from": "Income", "to": "Travel", "amount": 479.8, "year": 2023, "month": "Jul", "monthYear": "Jul 2023", "income_ref": 3254.74},
+{"from": "Income", "to": "Bills", "amount": 343.84, "year": 2023, "month": "Aug", "monthYear": "Aug 2023", "income_ref": 3212.48},
+{"from": "Income", "to": "Eating Out", "amount": 73.21000000000001, "year": 2023, "month": "Aug", "monthYear": "Aug 2023", "income_ref": 3212.48},
+{"from": "Income", "to": "Entertainment", "amount": 51.97, "year": 2023, "month": "Aug", "monthYear": "Aug 2023", "income_ref": 3212.48},
+{"from": "Income", "to": "Groceries", "amount": 337.25, "year": 2023, "month": "Aug", "monthYear": "Aug 2023", "income_ref": 3212.48},
+{"from": "Income", "to": "Health & Beauty", "amount": 24.99, "year": 2023, "month": "Aug", "monthYear": "Aug 2023", "income_ref": 3212.48},
+{"from": "Income", "to": "Home & Family", "amount": 1056.31, "year": 2023, "month": "Aug", "monthYear": "Aug 2023", "income_ref": 3212.48},
+{"from": "Income", "to": "Investment", "amount": 250.33, "year": 2023, "month": "Aug", "monthYear": "Aug 2023", "income_ref": 3212.48},
+{"from": "Income", "to": "Shopping", "amount": 42.769999999999996, "year": 2023, "month": "Aug", "monthYear": "Aug 2023", "income_ref": 3212.48},
+{"from": "Income", "to": "Transport", "amount": 204.97, "year": 2023, "month": "Aug", "monthYear": "Aug 2023", "income_ref": 3212.48},
+{"from": "Income", "to": "Travel", "amount": 532.23, "year": 2023, "month": "Aug", "monthYear": "Aug 2023", "income_ref": 3212.48},
+{"from": "Income", "to": "Bills", "amount": 333.84000000000003, "year": 2023, "month": "Sep", "monthYear": "Sep 2023", "income_ref": 3174.69},
+{"from": "Income", "to": "Eating Out", "amount": 124.02000000000001, "year": 2023, "month": "Sep", "monthYear": "Sep 2023", "income_ref": 3174.69},
+{"from": "Income", "to": "Entertainment", "amount": 51.97, "year": 2023, "month": "Sep", "monthYear": "Sep 2023", "income_ref": 3174.69},
+{"from": "Income", "to": "Groceries", "amount": 213.17000000000002, "year": 2023, "month": "Sep", "monthYear": "Sep 2023", "income_ref": 3174.69},
+{"from": "Income", "to": "Health & Beauty", "amount": 49.56, "year": 2023, "month": "Sep", "monthYear": "Sep 2023", "income_ref": 3174.69},
+{"from": "Income", "to": "Home & Family", "amount": 1027.25, "year": 2023, "month": "Sep", "monthYear": "Sep 2023", "income_ref": 3174.69},
+{"from": "Income", "to": "Investment", "amount": 269.43, "year": 2023, "month": "Sep", "monthYear": "Sep 2023", "income_ref": 3174.69},
+{"from": "Income", "to": "Shopping", "amount": 180.87, "year": 2023, "month": "Sep", "monthYear": "Sep 2023", "income_ref": 3174.69},
+{"from": "Income", "to": "Transport", "amount": 178.73, "year": 2023, "month": "Sep", "monthYear": "Sep 2023", "income_ref": 3174.69},
+{"from": "Income", "to": "Bills", "amount": 339.98999999999995, "year": 2023, "month": "Oct", "monthYear": "Oct 2023", "income_ref": 2759.48},
+{"from": "Income", "to": "Charity", "amount": 24.2, "year": 2023, "month": "Oct", "monthYear": "Oct 2023", "income_ref": 2759.48},
+{"from": "Income", "to": "Eating Out", "amount": 111.61999999999999, "year": 2023, "month": "Oct", "monthYear": "Oct 2023", "income_ref": 2759.48},
+{"from": "Income", "to": "Entertainment", "amount": 51.97, "year": 2023, "month": "Oct", "monthYear": "Oct 2023", "income_ref": 2759.48},
+{"from": "Income", "to": "Groceries", "amount": 244.99, "year": 2023, "month": "Oct", "monthYear": "Oct 2023", "income_ref": 2759.48},
+{"from": "Income", "to": "Health & Beauty", "amount": 24.99, "year": 2023, "month": "Oct", "monthYear": "Oct 2023", "income_ref": 2759.48},
+{"from": "Income", "to": "Home & Family", "amount": 1028.9, "year": 2023, "month": "Oct", "monthYear": "Oct 2023", "income_ref": 2759.48},
+{"from": "Income", "to": "Investment", "amount": 167.93, "year": 2023, "month": "Oct", "monthYear": "Oct 2023", "income_ref": 2759.48},
+{"from": "Income", "to": "Shopping", "amount": 191.76999999999998, "year": 2023, "month": "Oct", "monthYear": "Oct 2023", "income_ref": 2759.48},
+{"from": "Income", "to": "Transport", "amount": 321.15, "year": 2023, "month": "Oct", "monthYear": "Oct 2023", "income_ref": 2759.48},
+{"from": "Income", "to": "Bills", "amount": 335.07, "year": 2023, "month": "Nov", "monthYear": "Nov 2023", "income_ref": 3228.61},
+{"from": "Income", "to": "Charity", "amount": 13.08, "year": 2023, "month": "Nov", "monthYear": "Nov 2023", "income_ref": 3228.61},
+{"from": "Income", "to": "Eating Out", "amount": 111.95, "year": 2023, "month": "Nov", "monthYear": "Nov 2023", "income_ref": 3228.61},
+{"from": "Income", "to": "Entertainment", "amount": 51.97, "year": 2023, "month": "Nov", "monthYear": "Nov 2023", "income_ref": 3228.61},
+{"from": "Income", "to": "Groceries", "amount": 194.41, "year": 2023, "month": "Nov", "monthYear": "Nov 2023", "income_ref": 3228.61},
+{"from": "Income", "to": "Health & Beauty", "amount": 34.42, "year": 2023, "month": "Nov", "monthYear": "Nov 2023", "income_ref": 3228.61},
+{"from": "Income", "to": "Home & Family", "amount": 973.34, "year": 2023, "month": "Nov", "monthYear": "Nov 2023", "income_ref": 3228.61},
+{"from": "Income", "to": "Investment", "amount": 249.18, "year": 2023, "month": "Nov", "monthYear": "Nov 2023", "income_ref": 3228.61},
+{"from": "Income", "to": "Shopping", "amount": 315.82, "year": 2023, "month": "Nov", "monthYear": "Nov 2023", "income_ref": 3228.61},
+{"from": "Income", "to": "Transport", "amount": 154.32000000000002, "year": 2023, "month": "Nov", "monthYear": "Nov 2023", "income_ref": 3228.61},
+{"from": "Income", "to": "Bills", "amount": 345.84, "year": 2023, "month": "Dec", "monthYear": "Dec 2023", "income_ref": 3390.5},
+{"from": "Income", "to": "Charity", "amount": 7.01, "year": 2023, "month": "Dec", "monthYear": "Dec 2023", "income_ref": 3390.5},
+{"from": "Income", "to": "Eating Out", "amount": 86.53999999999999, "year": 2023, "month": "Dec", "monthYear": "Dec 2023", "income_ref": 3390.5},
+{"from": "Income", "to": "Entertainment", "amount": 51.97, "year": 2023, "month": "Dec", "monthYear": "Dec 2023", "income_ref": 3390.5},
+{"from": "Income", "to": "Groceries", "amount": 271.61, "year": 2023, "month": "Dec", "monthYear": "Dec 2023", "income_ref": 3390.5},
+{"from": "Income", "to": "Health & Beauty", "amount": 68.62, "year": 2023, "month": "Dec", "monthYear": "Dec 2023", "income_ref": 3390.5},
+{"from": "Income", "to": "Home & Family", "amount": 993.81, "year": 2023, "month": "Dec", "monthYear": "Dec 2023", "income_ref": 3390.5},
+{"from": "Income", "to": "Investment", "amount": 295.97, "year": 2023, "month": "Dec", "monthYear": "Dec 2023", "income_ref": 3390.5},
+{"from": "Income", "to": "Shopping", "amount": 365.98, "year": 2023, "month": "Dec", "monthYear": "Dec 2023", "income_ref": 3390.5},
+{"from": "Income", "to": "Transport", "amount": 297.11, "year": 2023, "month": "Dec", "monthYear": "Dec 2023", "income_ref": 3390.5},
+{"from": "Income", "to": "Travel", "amount": 506.12, "year": 2023, "month": "Dec", "monthYear": "Dec 2023", "income_ref": 3390.5},
+{"from": "Income", "to": "Bills", "amount": 338.37, "year": 2024, "month": "Jan", "monthYear": "Jan 2024", "income_ref": 2612.28},
+{"from": "Income", "to": "Charity", "amount": 5.16, "year": 2024, "month": "Jan", "monthYear": "Jan 2024", "income_ref": 2612.28},
+{"from": "Income", "to": "Eating Out", "amount": 93.87, "year": 2024, "month": "Jan", "monthYear": "Jan 2024", "income_ref": 2612.28},
+{"from": "Income", "to": "Entertainment", "amount": 51.97, "year": 2024, "month": "Jan", "monthYear": "Jan 2024", "income_ref": 2612.28},
+{"from": "Income", "to": "Groceries", "amount": 304.37, "year": 2024, "month": "Jan", "monthYear": "Jan 2024", "income_ref": 2612.28},
+{"from": "Income", "to": "Health & Beauty", "amount": 24.99, "year": 2024, "month": "Jan", "monthYear": "Jan 2024", "income_ref": 2612.28},
+{"from": "Income", "to": "Home & Family", "amount": 981.67, "year": 2024, "month": "Jan", "monthYear": "Jan 2024", "income_ref": 2612.28},
+{"from": "Income", "to": "Investment", "amount": 155.38, "year": 2024, "month": "Jan", "monthYear": "Jan 2024", "income_ref": 2612.28},
+{"from": "Income", "to": "Shopping", "amount": 231.91000000000003, "year": 2024, "month": "Jan", "monthYear": "Jan 2024", "income_ref": 2612.28},
+{"from": "Income", "to": "Transport", "amount": 172.68, "year": 2024, "month": "Jan", "monthYear": "Jan 2024", "income_ref": 2612.28},
+{"from": "Income", "to": "Bills", "amount": 344.44999999999993, "year": 2024, "month": "Feb", "monthYear": "Feb 2024", "income_ref": 3222.65},
+{"from": "Income", "to": "Charity", "amount": 6.26, "year": 2024, "month": "Feb", "monthYear": "Feb 2024", "income_ref": 3222.65},
+{"from": "Income", "to": "Eating Out", "amount": 77.53, "year": 2024, "month": "Feb", "monthYear": "Feb 2024", "income_ref": 3222.65},
+{"from": "Income", "to": "Entertainment", "amount": 51.97, "year": 2024, "month": "Feb", "monthYear": "Feb 2024", "income_ref": 3222.65},
+{"from": "Income", "to": "Groceries", "amount": 318.29, "year": 2024, "month": "Feb", "monthYear": "Feb 2024", "income_ref": 3222.65},
+{"from": "Income", "to": "Health & Beauty", "amount": 24.99, "year": 2024, "month": "Feb", "monthYear": "Feb 2024", "income_ref": 3222.65},
+{"from": "Income", "to": "Home & Family", "amount": 1017.78, "year": 2024, "month": "Feb", "monthYear": "Feb 2024", "income_ref": 3222.65},
+{"from": "Income", "to": "Investment", "amount": 244.24, "year": 2024, "month": "Feb", "monthYear": "Feb 2024", "income_ref": 3222.65},
+{"from": "Income", "to": "Shopping", "amount": 306.95, "year": 2024, "month": "Feb", "monthYear": "Feb 2024", "income_ref": 3222.65},
+{"from": "Income", "to": "Transport", "amount": 265.43, "year": 2024, "month": "Feb", "monthYear": "Feb 2024", "income_ref": 3222.65},
+{"from": "Income", "to": "Bills", "amount": 334.69000000000005, "year": 2024, "month": "Mar", "monthYear": "Mar 2024", "income_ref": 3327.51},
+{"from": "Income", "to": "Charity", "amount": 8.48, "year": 2024, "month": "Mar", "monthYear": "Mar 2024", "income_ref": 3327.51},
+{"from": "Income", "to": "Eating Out", "amount": 134.59, "year": 2024, "month": "Mar", "monthYear": "Mar 2024", "income_ref": 3327.51},
+{"from": "Income", "to": "Entertainment", "amount": 51.97, "year": 2024, "month": "Mar", "monthYear": "Mar 2024", "income_ref": 3327.51},
+{"from": "Income", "to": "Groceries", "amount": 295.84, "year": 2024, "month": "Mar", "monthYear": "Mar 2024", "income_ref": 3327.51},
+{"from": "Income", "to": "Health & Beauty", "amount": 61.8, "year": 2024, "month": "Mar", "monthYear": "Mar 2024", "income_ref": 3327.51},
+{"from": "Income", "to": "Home & Family", "amount": 1025.28, "year": 2024, "month": "Mar", "monthYear": "Mar 2024", "income_ref": 3327.51},
+{"from": "Income", "to": "Investment", "amount": 238.1, "year": 2024, "month": "Mar", "monthYear": "Mar 2024", "income_ref": 3327.51},
+{"from": "Income", "to": "Shopping", "amount": 140.7, "year": 2024, "month": "Mar", "monthYear": "Mar 2024", "income_ref": 3327.51},
+{"from": "Income", "to": "Transport", "amount": 178.87, "year": 2024, "month": "Mar", "monthYear": "Mar 2024", "income_ref": 3327.51},
+{"from": "Income", "to": "Bills", "amount": 332.03, "year": 2024, "month": "Apr", "monthYear": "Apr 2024", "income_ref": 2650.85},
+{"from": "Income", "to": "Charity", "amount": 21.91, "year": 2024, "month": "Apr", "monthYear": "Apr 2024", "income_ref": 2650.85},
+{"from": "Income", "to": "Eating Out", "amount": 172.71000000000004, "year": 2024, "month": "Apr", "monthYear": "Apr 2024", "income_ref": 2650.85},
+{"from": "Income", "to": "Entertainment", "amount": 51.97, "year": 2024, "month": "Apr", "monthYear": "Apr 2024", "income_ref": 2650.85},
+{"from": "Income", "to": "Groceries", "amount": 310.73, "year": 2024, "month": "Apr", "monthYear": "Apr 2024", "income_ref": 2650.85},
+{"from": "Income", "to": "Health & Beauty", "amount": 56.599999999999994, "year": 2024, "month": "Apr", "monthYear": "Apr 2024", "income_ref": 2650.85},
+{"from": "Income", "to": "Home & Family", "amount": 997.9, "year": 2024, "month": "Apr", "monthYear": "Apr 2024", "income_ref": 2650.85},
+{"from": "Income", "to": "Investment", "amount": 223.54, "year": 2024, "month": "Apr", "monthYear": "Apr 2024", "income_ref": 2650.85},
+{"from": "Income", "to": "Shopping", "amount": 275.34, "year": 2024, "month": "Apr", "monthYear": "Apr 2024", "income_ref": 2650.85},
+{"from": "Income", "to": "Transport", "amount": 183.91000000000003, "year": 2024, "month": "Apr", "monthYear": "Apr 2024", "income_ref": 2650.85},
+{"from": "Income", "to": "Bills", "amount": 338.77, "year": 2024, "month": "May", "monthYear": "May 2024", "income_ref": 3210.08},
+{"from": "Income", "to": "Eating Out", "amount": 133.09, "year": 2024, "month": "May", "monthYear": "May 2024", "income_ref": 3210.08},
+{"from": "Income", "to": "Entertainment", "amount": 51.97, "year": 2024, "month": "May", "monthYear": "May 2024", "income_ref": 3210.08},
+{"from": "Income", "to": "Groceries", "amount": 295.99, "year": 2024, "month": "May", "monthYear": "May 2024", "income_ref": 3210.08},
+{"from": "Income", "to": "Health & Beauty", "amount": 58.42999999999999, "year": 2024, "month": "May", "monthYear": "May 2024", "income_ref": 3210.08},
+{"from": "Income", "to": "Home & Family", "amount": 980.9, "year": 2024, "month": "May", "monthYear": "May 2024", "income_ref": 3210.08},
+{"from": "Income", "to": "Investment", "amount": 280.48, "year": 2024, "month": "May", "monthYear": "May 2024", "income_ref": 3210.08},
+{"from": "Income", "to": "Shopping", "amount": 191.19, "year": 2024, "month": "May", "monthYear": "May 2024", "income_ref": 3210.08},
+{"from": "Income", "to": "Transport", "amount": 160.65, "year": 2024, "month": "May", "monthYear": "May 2024", "income_ref": 3210.08},
+{"from": "Income", "to": "Bills", "amount": 341.03, "year": 2024, "month": "Jun", "monthYear": "Jun 2024", "income_ref": 3244.96},
+{"from": "Income", "to": "Charity", "amount": 17.89, "year": 2024, "month": "Jun", "monthYear": "Jun 2024", "income_ref": 3244.96},
+{"from": "Income", "to": "Eating Out", "amount": 101.8, "year": 2024, "month": "Jun", "monthYear": "Jun 2024", "income_ref": 3244.96},
+{"from": "Income", "to": "Entertainment", "amount": 51.97, "year": 2024, "month": "Jun", "monthYear": "Jun 2024", "income_ref": 3244.96},
+{"from": "Income", "to": "Groceries", "amount": 223.23999999999998, "year": 2024, "month": "Jun", "monthYear": "Jun 2024", "income_ref": 3244.96},
+{"from": "Income", "to": "Health & Beauty", "amount": 48.61, "year": 2024, "month": "Jun", "monthYear": "Jun 2024", "income_ref": 3244.96},
+{"from": "Income", "to": "Home & Family", "amount": 990.5, "year": 2024, "month": "Jun", "monthYear": "Jun 2024", "income_ref": 3244.96},
+{"from": "Income", "to": "Investment", "amount": 219.01, "year": 2024, "month": "Jun", "monthYear": "Jun 2024", "income_ref": 3244.96},
+{"from": "Income", "to": "Shopping", "amount": 90.69, "year": 2024, "month": "Jun", "monthYear": "Jun 2024", "income_ref": 3244.96},
+{"from": "Income", "to": "Transport", "amount": 218.22, "year": 2024, "month": "Jun", "monthYear": "Jun 2024", "income_ref": 3244.96},
+{"from": "Income", "to": "Travel", "amount": 351.1, "year": 2024, "month": "Jun", "monthYear": "Jun 2024", "income_ref": 3244.96},
+{"from": "Income", "to": "Bills", "amount": 342.71999999999997, "year": 2024, "month": "Jul", "monthYear": "Jul 2024", "income_ref": 2907.59},
+{"from": "Income", "to": "Eating Out", "amount": 105.23000000000002, "year": 2024, "month": "Jul", "monthYear": "Jul 2024", "income_ref": 2907.59},
+{"from": "Income", "to": "Entertainment", "amount": 51.97, "year": 2024, "month": "Jul", "monthYear": "Jul 2024", "income_ref": 2907.59},
+{"from": "Income", "to": "Groceries", "amount": 272.17999999999995, "year": 2024, "month": "Jul", "monthYear": "Jul 2024", "income_ref": 2907.59},
+{"from": "Income", "to": "Health & Beauty", "amount": 24.99, "year": 2024, "month": "Jul", "monthYear": "Jul 2024", "income_ref": 2907.59},
+{"from": "Income", "to": "Home & Family", "amount": 958.43, "year": 2024, "month": "Jul", "monthYear": "Jul 2024", "income_ref": 2907.59},
+{"from": "Income", "to": "Investment", "amount": 256.14, "year": 2024, "month": "Jul", "monthYear": "Jul 2024", "income_ref": 2907.59},
+{"from": "Income", "to": "Shopping", "amount": 81.09, "year": 2024, "month": "Jul", "monthYear": "Jul 2024", "income_ref": 2907.59},
+{"from": "Income", "to": "Transport", "amount": 225.79, "year": 2024, "month": "Jul", "monthYear": "Jul 2024", "income_ref": 2907.59},
+{"from": "Income", "to": "Travel", "amount": 352.65, "year": 2024, "month": "Jul", "monthYear": "Jul 2024", "income_ref": 2907.59},
+{"from": "Income", "to": "Bills", "amount": 345.57000000000005, "year": 2024, "month": "Aug", "monthYear": "Aug 2024", "income_ref": 2723.4},
+{"from": "Income", "to": "Eating Out", "amount": 89.39, "year": 2024, "month": "Aug", "monthYear": "Aug 2024", "income_ref": 2723.4},
+{"from": "Income", "to": "Entertainment", "amount": 51.97, "year": 2024, "month": "Aug", "monthYear": "Aug 2024", "income_ref": 2723.4},
+{"from": "Income", "to": "Groceries", "amount": 291.94000000000005, "year": 2024, "month": "Aug", "monthYear": "Aug 2024", "income_ref": 2723.4},
+{"from": "Income", "to": "Health & Beauty", "amount": 24.99, "year": 2024, "month": "Aug", "monthYear": "Aug 2024", "income_ref": 2723.4},
+{"from": "Income", "to": "Home & Family", "amount": 1024.85, "year": 2024, "month": "Aug", "monthYear": "Aug 2024", "income_ref": 2723.4},
+{"from": "Income", "to": "Investment", "amount": 196.42, "year": 2024, "month": "Aug", "monthYear": "Aug 2024", "income_ref": 2723.4},
+{"from": "Income", "to": "Shopping", "amount": 72.47, "year": 2024, "month": "Aug", "monthYear": "Aug 2024", "income_ref": 2723.4},
+{"from": "Income", "to": "Transport", "amount": 226.29999999999998, "year": 2024, "month": "Aug", "monthYear": "Aug 2024", "income_ref": 2723.4},
+{"from": "Income", "to": "Travel", "amount": 503.87, "year": 2024, "month": "Aug", "monthYear": "Aug 2024", "income_ref": 2723.4},
+{"from": "Income", "to": "Bills", "amount": 342.27, "year": 2024, "month": "Sep", "monthYear": "Sep 2024", "income_ref": 2615.2},
+{"from": "Income", "to": "Charity", "amount": 15.86, "year": 2024, "month": "Sep", "monthYear": "Sep 2024", "income_ref": 2615.2},
+{"from": "Income", "to": "Eating Out", "amount": 129.33, "year": 2024, "month": "Sep", "monthYear": "Sep 2024", "income_ref": 2615.2},
+{"from": "Income", "to": "Entertainment", "amount": 51.97, "year": 2024, "month": "Sep", "monthYear": "Sep 2024", "income_ref": 2615.2},
+{"from": "Income", "to": "Groceries", "amount": 235.82999999999998, "year": 2024, "month": "Sep", "monthYear": "Sep 2024", "income_ref": 2615.2},
+{"from": "Income", "to": "Health & Beauty", "amount": 43.3, "year": 2024, "month": "Sep", "monthYear": "Sep 2024", "income_ref": 2615.2},
+{"from": "Income", "to": "Home & Family", "amount": 1091.02, "year": 2024, "month": "Sep", "monthYear": "Sep 2024", "income_ref": 2615.2},
+{"from": "Income", "to": "Investment", "amount": 275.5, "year": 2024, "month": "Sep", "monthYear": "Sep 2024", "income_ref": 2615.2},
+{"from": "Income", "to": "Shopping", "amount": 153.21, "year": 2024, "month": "Sep", "monthYear": "Sep 2024", "income_ref": 2615.2},
+{"from": "Income", "to": "Transport", "amount": 173.88, "year": 2024, "month": "Sep", "monthYear": "Sep 2024", "income_ref": 2615.2},
+{"from": "Income", "to": "Bills", "amount": 337.7, "year": 2024, "month": "Oct", "monthYear": "Oct 2024", "income_ref": 3404.04},
+{"from": "Income", "to": "Charity", "amount": 13.93, "year": 2024, "month": "Oct", "monthYear": "Oct 2024", "income_ref": 3404.04},
+{"from": "Income", "to": "Eating Out", "amount": 163.34, "year": 2024, "month": "Oct", "monthYear": "Oct 2024", "income_ref": 3404.04},
+{"from": "Income", "to": "Entertainment", "amount": 51.97, "year": 2024, "month": "Oct", "monthYear": "Oct 2024", "income_ref": 3404.04},
+{"from": "Income", "to": "Groceries", "amount": 260.58, "year": 2024, "month": "Oct", "monthYear": "Oct 2024", "income_ref": 3404.04},
+{"from": "Income", "to": "Health & Beauty", "amount": 24.99, "year": 2024, "month": "Oct", "monthYear": "Oct 2024", "income_ref": 3404.04},
+{"from": "Income", "to": "Home & Family", "amount": 958.26, "year": 2024, "month": "Oct", "monthYear": "Oct 2024", "income_ref": 3404.04},
+{"from": "Income", "to": "Investment", "amount": 299.26, "year": 2024, "month": "Oct", "monthYear": "Oct 2024", "income_ref": 3404.04},
+{"from": "Income", "to": "Shopping", "amount": 78.27, "year": 2024, "month": "Oct", "monthYear": "Oct 2024", "income_ref": 3404.04},
+{"from": "Income", "to": "Transport", "amount": 227.96, "year": 2024, "month": "Oct", "monthYear": "Oct 2024", "income_ref": 3404.04},
+{"from": "Income", "to": "Bills", "amount": 346.23, "year": 2024, "month": "Nov", "monthYear": "Nov 2024", "income_ref": 3138.7200000000003},
+{"from": "Income", "to": "Charity", "amount": 15.67, "year": 2024, "month": "Nov", "monthYear": "Nov 2024", "income_ref": 3138.7200000000003},
+{"from": "Income", "to": "Eating Out", "amount": 83.41, "year": 2024, "month": "Nov", "monthYear": "Nov 2024", "income_ref": 3138.7200000000003},
+{"from": "Income", "to": "Entertainment", "amount": 51.97, "year": 2024, "month": "Nov", "monthYear": "Nov 2024", "income_ref": 3138.7200000000003},
+{"from": "Income", "to": "Groceries", "amount": 214.91000000000003, "year": 2024, "month": "Nov", "monthYear": "Nov 2024", "income_ref": 3138.7200000000003},
+{"from": "Income", "to": "Health & Beauty", "amount": 24.99, "year": 2024, "month": "Nov", "monthYear": "Nov 2024", "income_ref": 3138.7200000000003},
+{"from": "Income", "to": "Home & Family", "amount": 1035.14, "year": 2024, "month": "Nov", "monthYear": "Nov 2024", "income_ref": 3138.7200000000003},
+{"from": "Income", "to": "Investment", "amount": 269.05, "year": 2024, "month": "Nov", "monthYear": "Nov 2024", "income_ref": 3138.7200000000003},
+{"from": "Income", "to": "Shopping", "amount": 346.85, "year": 2024, "month": "Nov", "monthYear": "Nov 2024", "income_ref": 3138.7200000000003},
+{"from": "Income", "to": "Transport", "amount": 124.67, "year": 2024, "month": "Nov", "monthYear": "Nov 2024", "income_ref": 3138.7200000000003},
+{"from": "Income", "to": "Bills", "amount": 331.94, "year": 2024, "month": "Dec", "monthYear": "Dec 2024", "income_ref": 3009.48},
+{"from": "Income", "to": "Eating Out", "amount": 89.95, "year": 2024, "month": "Dec", "monthYear": "Dec 2024", "income_ref": 3009.48},
+{"from": "Income", "to": "Entertainment", "amount": 51.97, "year": 2024, "month": "Dec", "monthYear": "Dec 2024", "income_ref": 3009.48},
+{"from": "Income", "to": "Groceries", "amount": 227.36, "year": 2024, "month": "Dec", "monthYear": "Dec 2024", "income_ref": 3009.48},
+{"from": "Income", "to": "Health & Beauty", "amount": 24.99, "year": 2024, "month": "Dec", "monthYear": "Dec 2024", "income_ref": 3009.48},
+{"from": "Income", "to": "Home & Family", "amount": 991.66, "year": 2024, "month": "Dec", "monthYear": "Dec 2024", "income_ref": 3009.48},
+{"from": "Income", "to": "Investment", "amount": 193.45, "year": 2024, "month": "Dec", "monthYear": "Dec 2024", "income_ref": 3009.48},
+{"from": "Income", "to": "Shopping", "amount": 287.04, "year": 2024, "month": "Dec", "monthYear": "Dec 2024", "income_ref": 3009.48},
+{"from": "Income", "to": "Transport", "amount": 175.48999999999998, "year": 2024, "month": "Dec", "monthYear": "Dec 2024", "income_ref": 3009.48},
+{"from": "Income", "to": "Travel", "amount": 64.01, "year": 2024, "month": "Dec", "monthYear": "Dec 2024", "income_ref": 3009.48}
+];
+var CC   = {"Bills": "#E63946", "Charity": "#06D6A0", "Cash": "#ADB5BD", "Eating Out": "#FF6B35", "Entertainment": "#7B2D8B", "Finances": "#4895EF", "General": "#ADB5BD", "Groceries": "#52B788", "Health & Beauty": "#F72585", "Home & Family": "#7209B7", "Investment": "#4CC9F0", "Shopping": "#F77F00", "Transport": "#3A0CA3", "Travel": "#560BAD"};
+var TXNS = [
+{"id": 0, "date": "2023-01-01", "merchant": "PureGym", "desc": "PUREGYM LIMITED", "amount": 24.99, "cat": "Health & Beauty", "year": 2023, "month": "Jan"},
+{"id": 1, "date": "2023-01-01", "merchant": "Thames Water", "desc": "THAMES WATER UTIL", "amount": 37.41, "cat": "Bills", "year": 2023, "month": "Jan"},
+{"id": 2, "date": "2023-01-01", "merchant": "Council Tax", "desc": "LBHF COUNCIL TAX", "amount": 139.75, "cat": "Bills", "year": 2023, "month": "Jan"},
+{"id": 3, "date": "2023-01-01", "merchant": "Rent Payment", "desc": "RENT PAYMENT SO", "amount": 1000.54, "cat": "Home & Family", "year": 2023, "month": "Jan"},
+{"id": 4, "date": "2023-01-01", "merchant": "Netflix", "desc": "NETFLIX.COM", "amount": 15.99, "cat": "Entertainment", "year": 2023, "month": "Jan"},
+{"id": 5, "date": "2023-01-02", "merchant": "British Gas", "desc": "BRITISH GAS SERVICES", "amount": 49.79, "cat": "Bills", "year": 2023, "month": "Jan"},
+{"id": 6, "date": "2023-01-02", "merchant": "Sky Sports", "desc": "SKY DIGITAL", "amount": 25.99, "cat": "Entertainment", "year": 2023, "month": "Jan"},
+{"id": 7, "date": "2023-01-03", "merchant": "Lidl", "desc": "LIDL GB GMBH", "amount": 52.26, "cat": "Groceries", "year": 2023, "month": "Jan"},
+{"id": 8, "date": "2023-01-04", "merchant": "BT Broadband", "desc": "BT GROUP PLC", "amount": 38.25, "cat": "Bills", "year": 2023, "month": "Jan"},
+{"id": 9, "date": "2023-01-05", "merchant": "EDF Energy", "desc": "EDF ENERGY CUSTOMERS", "amount": 64.7, "cat": "Bills", "year": 2023, "month": "Jan"},
+{"id": 10, "date": "2023-01-05", "merchant": "Spotify", "desc": "SPOTIFY AB", "amount": 9.99, "cat": "Entertainment", "year": 2023, "month": "Jan"},
+{"id": 11, "date": "2023-01-06", "merchant": "Boots", "desc": "BOOTS UK LTD", "amount": 24.03, "cat": "Health & Beauty", "year": 2023, "month": "Jan"},
+{"id": 12, "date": "2023-01-06", "merchant": "BP Petrol", "desc": "BP OIL UK LTD", "amount": 22.88, "cat": "Transport", "year": 2023, "month": "Jan"},
+{"id": 13, "date": "2023-01-08", "merchant": "Tesco", "desc": "TESCO STORES 3321", "amount": 85.85, "cat": "Groceries", "year": 2023, "month": "Jan"},
+{"id": 14, "date": "2023-01-13", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 18.18, "cat": "Transport", "year": 2023, "month": "Jan"},
+{"id": 15, "date": "2023-01-14", "merchant": "Vanguard ISA", "desc": "VANGUARD ASSET MGMT", "amount": 212.93, "cat": "Investment", "year": 2023, "month": "Jan"},
+{"id": 16, "date": "2023-01-16", "merchant": "ASDA", "desc": "ASDA STORES 4766", "amount": 42.44, "cat": "Groceries", "year": 2023, "month": "Jan"},
+{"id": 17, "date": "2023-01-18", "merchant": "Costa Coffee", "desc": "COSTA COFFEE 091", "amount": 11.12, "cat": "Eating Out", "year": 2023, "month": "Jan"},
+{"id": 18, "date": "2023-01-18", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 18.95, "cat": "Transport", "year": 2023, "month": "Jan"},
+{"id": 19, "date": "2023-01-20", "merchant": "Amazon", "desc": "AMAZON UK RETAIL", "amount": 93.28, "cat": "Shopping", "year": 2023, "month": "Jan"},
+{"id": 20, "date": "2023-01-22", "merchant": "ASDA", "desc": "ASDA STORES 4766", "amount": 37.42, "cat": "Groceries", "year": 2023, "month": "Jan"},
+{"id": 21, "date": "2023-01-22", "merchant": "British Red Cross", "desc": "BRITISH RED CROSS", "amount": 11.49, "cat": "Charity", "year": 2023, "month": "Jan"},
+{"id": 22, "date": "2023-01-23", "merchant": "John Lewis", "desc": "JOHN LEWIS PLC", "amount": 131.89, "cat": "Shopping", "year": 2023, "month": "Jan"},
+{"id": 23, "date": "2023-01-23", "merchant": "Shell Petrol", "desc": "SHELL PETROL STATION", "amount": 7.55, "cat": "Transport", "year": 2023, "month": "Jan"},
+{"id": 24, "date": "2023-01-25", "merchant": "Shell Petrol", "desc": "SHELL PETROL STATION", "amount": 18.76, "cat": "Transport", "year": 2023, "month": "Jan"},
+{"id": 26, "date": "2023-01-26", "merchant": "Nando's", "desc": "NANDOS RESTAURANT", "amount": 8.43, "cat": "Eating Out", "year": 2023, "month": "Jan"},
+{"id": 27, "date": "2023-01-28", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 22.44, "cat": "Transport", "year": 2023, "month": "Jan"},
+{"id": 28, "date": "2023-01-28", "merchant": "Nando's", "desc": "NANDOS RESTAURANT", "amount": 18.35, "cat": "Eating Out", "year": 2023, "month": "Jan"},
+{"id": 29, "date": "2023-01-28", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 15.87, "cat": "Transport", "year": 2023, "month": "Jan"},
+{"id": 30, "date": "2023-02-01", "merchant": "PureGym", "desc": "PUREGYM LIMITED", "amount": 24.99, "cat": "Health & Beauty", "year": 2023, "month": "Feb"},
+{"id": 31, "date": "2023-02-01", "merchant": "Rent Payment", "desc": "RENT PAYMENT SO", "amount": 1041.45, "cat": "Home & Family", "year": 2023, "month": "Feb"},
+{"id": 32, "date": "2023-02-02", "merchant": "Thames Water", "desc": "THAMES WATER UTIL", "amount": 39.31, "cat": "Bills", "year": 2023, "month": "Feb"},
+{"id": 33, "date": "2023-02-02", "merchant": "Spotify", "desc": "SPOTIFY AB", "amount": 9.99, "cat": "Entertainment", "year": 2023, "month": "Feb"},
+{"id": 34, "date": "2023-02-03", "merchant": "BT Broadband", "desc": "BT GROUP PLC", "amount": 39.7, "cat": "Bills", "year": 2023, "month": "Feb"},
+{"id": 35, "date": "2023-02-03", "merchant": "Sky Sports", "desc": "SKY DIGITAL", "amount": 25.99, "cat": "Entertainment", "year": 2023, "month": "Feb"},
+{"id": 36, "date": "2023-02-03", "merchant": "Waitrose", "desc": "WAITROSE & PARTNERS", "amount": 51.02, "cat": "Groceries", "year": 2023, "month": "Feb"},
+{"id": 37, "date": "2023-02-04", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 48.4, "cat": "Transport", "year": 2023, "month": "Feb"},
+{"id": 38, "date": "2023-02-04", "merchant": "British Gas", "desc": "BRITISH GAS SERVICES", "amount": 50.14, "cat": "Bills", "year": 2023, "month": "Feb"},
+{"id": 39, "date": "2023-02-04", "merchant": "BP Petrol", "desc": "BP OIL UK LTD", "amount": 18.97, "cat": "Transport", "year": 2023, "month": "Feb"},
+{"id": 40, "date": "2023-02-04", "merchant": "Council Tax", "desc": "LBHF COUNCIL TAX", "amount": 141.17, "cat": "Bills", "year": 2023, "month": "Feb"},
+{"id": 41, "date": "2023-02-04", "merchant": "Netflix", "desc": "NETFLIX.COM", "amount": 15.99, "cat": "Entertainment", "year": 2023, "month": "Feb"},
+{"id": 42, "date": "2023-02-05", "merchant": "McDonald's", "desc": "MCDONALDS 6482", "amount": 27.71, "cat": "Eating Out", "year": 2023, "month": "Feb"},
+{"id": 43, "date": "2023-02-05", "merchant": "EDF Energy", "desc": "EDF ENERGY CUSTOMERS", "amount": 71.01, "cat": "Bills", "year": 2023, "month": "Feb"},
+{"id": 44, "date": "2023-02-09", "merchant": "Waitrose", "desc": "WAITROSE & PARTNERS", "amount": 101.83, "cat": "Groceries", "year": 2023, "month": "Feb"},
+{"id": 45, "date": "2023-02-11", "merchant": "Vanguard ISA", "desc": "VANGUARD ASSET MGMT", "amount": 186.99, "cat": "Investment", "year": 2023, "month": "Feb"},
+{"id": 46, "date": "2023-02-12", "merchant": "ASOS", "desc": "ASOS.COM LTD", "amount": 109.6, "cat": "Shopping", "year": 2023, "month": "Feb"},
+{"id": 47, "date": "2023-02-15", "merchant": "Shell Petrol", "desc": "SHELL PETROL STATION", "amount": 4.17, "cat": "Transport", "year": 2023, "month": "Feb"},
+{"id": 48, "date": "2023-02-16", "merchant": "Lidl", "desc": "LIDL GB GMBH", "amount": 47.55, "cat": "Groceries", "year": 2023, "month": "Feb"},
+{"id": 49, "date": "2023-02-17", "merchant": "BP Petrol", "desc": "BP OIL UK LTD", "amount": 42.86, "cat": "Transport", "year": 2023, "month": "Feb"},
+{"id": 50, "date": "2023-02-18", "merchant": "BP Petrol", "desc": "BP OIL UK LTD", "amount": 47.9, "cat": "Transport", "year": 2023, "month": "Feb"},
+{"id": 51, "date": "2023-02-20", "merchant": "Costa Coffee", "desc": "COSTA COFFEE 091", "amount": 39.87, "cat": "Eating Out", "year": 2023, "month": "Feb"},
+{"id": 52, "date": "2023-02-20", "merchant": "Costa Coffee", "desc": "COSTA COFFEE 091", "amount": 9.1, "cat": "Eating Out", "year": 2023, "month": "Feb"},
+{"id": 53, "date": "2023-02-22", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 40.76, "cat": "Transport", "year": 2023, "month": "Feb"},
+{"id": 54, "date": "2023-02-24", "merchant": "Sainsburys", "desc": "SAINSBURYS SUPERSTORE", "amount": 69.48, "cat": "Groceries", "year": 2023, "month": "Feb"},
+{"id": 55, "date": "2023-02-25", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 17.61, "cat": "Transport", "year": 2023, "month": "Feb"},
+{"id": 57, "date": "2023-02-25", "merchant": "Zara", "desc": "ZARA UK LTD", "amount": 130.07, "cat": "Shopping", "year": 2023, "month": "Feb"},
+{"id": 58, "date": "2023-02-27", "merchant": "BP Petrol", "desc": "BP OIL UK LTD", "amount": 36.59, "cat": "Transport", "year": 2023, "month": "Feb"},
+{"id": 59, "date": "2023-03-01", "merchant": "Nando's", "desc": "NANDOS RESTAURANT", "amount": 26.41, "cat": "Eating Out", "year": 2023, "month": "Mar"},
+{"id": 60, "date": "2023-03-01", "merchant": "EDF Energy", "desc": "EDF ENERGY CUSTOMERS", "amount": 64.69, "cat": "Bills", "year": 2023, "month": "Mar"},
+{"id": 61, "date": "2023-03-01", "merchant": "PureGym", "desc": "PUREGYM LIMITED", "amount": 24.99, "cat": "Health & Beauty", "year": 2023, "month": "Mar"},
+{"id": 62, "date": "2023-03-01", "merchant": "Rent Payment", "desc": "RENT PAYMENT SO", "amount": 962.84, "cat": "Home & Family", "year": 2023, "month": "Mar"},
+{"id": 63, "date": "2023-03-02", "merchant": "Waitrose", "desc": "WAITROSE & PARTNERS", "amount": 107.15, "cat": "Groceries", "year": 2023, "month": "Mar"},
+{"id": 64, "date": "2023-03-02", "merchant": "Sky Sports", "desc": "SKY DIGITAL", "amount": 25.99, "cat": "Entertainment", "year": 2023, "month": "Mar"},
+{"id": 65, "date": "2023-03-02", "merchant": "Thames Water", "desc": "THAMES WATER UTIL", "amount": 39.02, "cat": "Bills", "year": 2023, "month": "Mar"},
+{"id": 66, "date": "2023-03-03", "merchant": "Pret A Manger", "desc": "PRET A MANGER LTD", "amount": 36.88, "cat": "Eating Out", "year": 2023, "month": "Mar"},
+{"id": 67, "date": "2023-03-03", "merchant": "Nando's", "desc": "NANDOS RESTAURANT", "amount": 23.97, "cat": "Eating Out", "year": 2023, "month": "Mar"},
+{"id": 68, "date": "2023-03-03", "merchant": "British Gas", "desc": "BRITISH GAS SERVICES", "amount": 49.92, "cat": "Bills", "year": 2023, "month": "Mar"},
+{"id": 69, "date": "2023-03-04", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 37.61, "cat": "Transport", "year": 2023, "month": "Mar"},
+{"id": 70, "date": "2023-03-04", "merchant": "BT Broadband", "desc": "BT GROUP PLC", "amount": 44.53, "cat": "Bills", "year": 2023, "month": "Mar"},
+{"id": 71, "date": "2023-03-04", "merchant": "Netflix", "desc": "NETFLIX.COM", "amount": 15.99, "cat": "Entertainment", "year": 2023, "month": "Mar"},
+{"id": 72, "date": "2023-03-05", "merchant": "Council Tax", "desc": "LBHF COUNCIL TAX", "amount": 144.13, "cat": "Bills", "year": 2023, "month": "Mar"},
+{"id": 73, "date": "2023-03-05", "merchant": "Spotify", "desc": "SPOTIFY AB", "amount": 9.99, "cat": "Entertainment", "year": 2023, "month": "Mar"},
+{"id": 74, "date": "2023-03-07", "merchant": "Uber", "desc": "UBER *TRIP", "amount": 31.5, "cat": "Transport", "year": 2023, "month": "Mar"},
+{"id": 75, "date": "2023-03-07", "merchant": "British Red Cross", "desc": "BRITISH RED CROSS", "amount": 15.73, "cat": "Charity", "year": 2023, "month": "Mar"},
+{"id": 76, "date": "2023-03-08", "merchant": "McDonald's", "desc": "MCDONALDS 6482", "amount": 14.42, "cat": "Eating Out", "year": 2023, "month": "Mar"},
+{"id": 77, "date": "2023-03-09", "merchant": "IKEA", "desc": "IKEA LTD", "amount": 94.02, "cat": "Home & Family", "year": 2023, "month": "Mar"},
+{"id": 78, "date": "2023-03-10", "merchant": "Waitrose", "desc": "WAITROSE & PARTNERS", "amount": 85.19, "cat": "Groceries", "year": 2023, "month": "Mar"},
+{"id": 79, "date": "2023-03-12", "merchant": "Vanguard ISA", "desc": "VANGUARD ASSET MGMT", "amount": 229.15, "cat": "Investment", "year": 2023, "month": "Mar"},
+{"id": 80, "date": "2023-03-13", "merchant": "Amazon", "desc": "AMAZON UK RETAIL", "amount": 105.21, "cat": "Shopping", "year": 2023, "month": "Mar"},
+{"id": 81, "date": "2023-03-14", "merchant": "BP Petrol", "desc": "BP OIL UK LTD", "amount": 24.97, "cat": "Transport", "year": 2023, "month": "Mar"},
+{"id": 82, "date": "2023-03-16", "merchant": "ASDA", "desc": "ASDA STORES 4766", "amount": 109.61, "cat": "Groceries", "year": 2023, "month": "Mar"},
+{"id": 83, "date": "2023-03-19", "merchant": "Pret A Manger", "desc": "PRET A MANGER LTD", "amount": 14.27, "cat": "Eating Out", "year": 2023, "month": "Mar"},
+{"id": 84, "date": "2023-03-19", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 28.11, "cat": "Transport", "year": 2023, "month": "Mar"},
+{"id": 85, "date": "2023-03-22", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 37.33, "cat": "Transport", "year": 2023, "month": "Mar"},
+{"id": 86, "date": "2023-03-23", "merchant": "McDonald's", "desc": "MCDONALDS 6482", "amount": 27.83, "cat": "Eating Out", "year": 2023, "month": "Mar"},
+{"id": 87, "date": "2023-03-23", "merchant": "ASDA", "desc": "ASDA STORES 4766", "amount": 101.97, "cat": "Groceries", "year": 2023, "month": "Mar"},
+{"id": 88, "date": "2023-03-26", "merchant": "Uber", "desc": "UBER *TRIP", "amount": 24.76, "cat": "Transport", "year": 2023, "month": "Mar"},
+{"id": 90, "date": "2023-04-01", "merchant": "Amazon", "desc": "AMAZON UK RETAIL", "amount": 70.66, "cat": "Shopping", "year": 2023, "month": "Apr"},
+{"id": 91, "date": "2023-04-01", "merchant": "PureGym", "desc": "PUREGYM LIMITED", "amount": 24.99, "cat": "Health & Beauty", "year": 2023, "month": "Apr"},
+{"id": 92, "date": "2023-04-01", "merchant": "Netflix", "desc": "NETFLIX.COM", "amount": 15.99, "cat": "Entertainment", "year": 2023, "month": "Apr"},
+{"id": 93, "date": "2023-04-01", "merchant": "Rent Payment", "desc": "RENT PAYMENT SO", "amount": 1036.47, "cat": "Home & Family", "year": 2023, "month": "Apr"},
+{"id": 94, "date": "2023-04-01", "merchant": "EDF Energy", "desc": "EDF ENERGY CUSTOMERS", "amount": 71.41, "cat": "Bills", "year": 2023, "month": "Apr"},
+{"id": 95, "date": "2023-04-02", "merchant": "Nando's", "desc": "NANDOS RESTAURANT", "amount": 8.65, "cat": "Eating Out", "year": 2023, "month": "Apr"},
+{"id": 96, "date": "2023-04-02", "merchant": "BT Broadband", "desc": "BT GROUP PLC", "amount": 39.33, "cat": "Bills", "year": 2023, "month": "Apr"},
+{"id": 97, "date": "2023-04-02", "merchant": "Spotify", "desc": "SPOTIFY AB", "amount": 9.99, "cat": "Entertainment", "year": 2023, "month": "Apr"},
+{"id": 98, "date": "2023-04-02", "merchant": "ASDA", "desc": "ASDA STORES 4766", "amount": 52.82, "cat": "Groceries", "year": 2023, "month": "Apr"},
+{"id": 99, "date": "2023-04-03", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 38.44, "cat": "Transport", "year": 2023, "month": "Apr"},
+{"id": 100, "date": "2023-04-04", "merchant": "Council Tax", "desc": "LBHF COUNCIL TAX", "amount": 141.85, "cat": "Bills", "year": 2023, "month": "Apr"},
+{"id": 101, "date": "2023-04-04", "merchant": "Sky Sports", "desc": "SKY DIGITAL", "amount": 25.99, "cat": "Entertainment", "year": 2023, "month": "Apr"},
+{"id": 102, "date": "2023-04-05", "merchant": "British Gas", "desc": "BRITISH GAS SERVICES", "amount": 48.78, "cat": "Bills", "year": 2023, "month": "Apr"},
+{"id": 103, "date": "2023-04-05", "merchant": "Thames Water", "desc": "THAMES WATER UTIL", "amount": 38.69, "cat": "Bills", "year": 2023, "month": "Apr"},
+{"id": 104, "date": "2023-04-06", "merchant": "Subway", "desc": "SUBWAY 12340", "amount": 8.88, "cat": "Eating Out", "year": 2023, "month": "Apr"},
+{"id": 105, "date": "2023-04-07", "merchant": "BP Petrol", "desc": "BP OIL UK LTD", "amount": 38.16, "cat": "Transport", "year": 2023, "month": "Apr"},
+{"id": 106, "date": "2023-04-08", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 33.52, "cat": "Transport", "year": 2023, "month": "Apr"},
+{"id": 107, "date": "2023-04-08", "merchant": "BP Petrol", "desc": "BP OIL UK LTD", "amount": 17.55, "cat": "Transport", "year": 2023, "month": "Apr"},
+{"id": 108, "date": "2023-04-10", "merchant": "Vanguard ISA", "desc": "VANGUARD ASSET MGMT", "amount": 297.8, "cat": "Investment", "year": 2023, "month": "Apr"},
+{"id": 109, "date": "2023-04-10", "merchant": "Waitrose", "desc": "WAITROSE & PARTNERS", "amount": 87.47, "cat": "Groceries", "year": 2023, "month": "Apr"},
+{"id": 110, "date": "2023-04-13", "merchant": "Shell Petrol", "desc": "SHELL PETROL STATION", "amount": 10.11, "cat": "Transport", "year": 2023, "month": "Apr"},
+{"id": 111, "date": "2023-04-15", "merchant": "John Lewis", "desc": "JOHN LEWIS PLC", "amount": 52.47, "cat": "Shopping", "year": 2023, "month": "Apr"},
+{"id": 112, "date": "2023-04-15", "merchant": "Sainsburys", "desc": "SAINSBURYS SUPERSTORE", "amount": 53.74, "cat": "Groceries", "year": 2023, "month": "Apr"},
+{"id": 113, "date": "2023-04-17", "merchant": "Costa Coffee", "desc": "COSTA COFFEE 091", "amount": 37.34, "cat": "Eating Out", "year": 2023, "month": "Apr"},
+{"id": 114, "date": "2023-04-17", "merchant": "IKEA", "desc": "IKEA LTD", "amount": 62.43, "cat": "Home & Family", "year": 2023, "month": "Apr"},
+{"id": 115, "date": "2023-04-19", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 30.66, "cat": "Transport", "year": 2023, "month": "Apr"},
+{"id": 116, "date": "2023-04-20", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 8.18, "cat": "Transport", "year": 2023, "month": "Apr"},
+{"id": 117, "date": "2023-04-24", "merchant": "Tesco", "desc": "TESCO STORES 3321", "amount": 88.86, "cat": "Groceries", "year": 2023, "month": "Apr"},
+{"id": 119, "date": "2023-04-28", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 13.48, "cat": "Transport", "year": 2023, "month": "Apr"},
+{"id": 120, "date": "2023-05-01", "merchant": "Argos", "desc": "ARGOS LTD", "amount": 34.96, "cat": "Shopping", "year": 2023, "month": "May"},
+{"id": 121, "date": "2023-05-01", "merchant": "McDonald's", "desc": "MCDONALDS 6482", "amount": 18.01, "cat": "Eating Out", "year": 2023, "month": "May"},
+{"id": 122, "date": "2023-05-01", "merchant": "Sky Sports", "desc": "SKY DIGITAL", "amount": 25.99, "cat": "Entertainment", "year": 2023, "month": "May"},
+{"id": 123, "date": "2023-05-01", "merchant": "Rent Payment", "desc": "RENT PAYMENT SO", "amount": 1016.34, "cat": "Home & Family", "year": 2023, "month": "May"},
+{"id": 124, "date": "2023-05-01", "merchant": "PureGym", "desc": "PUREGYM LIMITED", "amount": 24.99, "cat": "Health & Beauty", "year": 2023, "month": "May"},
+{"id": 125, "date": "2023-05-02", "merchant": "Netflix", "desc": "NETFLIX.COM", "amount": 15.99, "cat": "Entertainment", "year": 2023, "month": "May"},
+{"id": 126, "date": "2023-05-02", "merchant": "Sainsburys", "desc": "SAINSBURYS SUPERSTORE", "amount": 52.54, "cat": "Groceries", "year": 2023, "month": "May"},
+{"id": 127, "date": "2023-05-03", "merchant": "EDF Energy", "desc": "EDF ENERGY CUSTOMERS", "amount": 68.89, "cat": "Bills", "year": 2023, "month": "May"},
+{"id": 128, "date": "2023-05-03", "merchant": "Spotify", "desc": "SPOTIFY AB", "amount": 9.99, "cat": "Entertainment", "year": 2023, "month": "May"},
+{"id": 129, "date": "2023-05-03", "merchant": "British Gas", "desc": "BRITISH GAS SERVICES", "amount": 50.28, "cat": "Bills", "year": 2023, "month": "May"},
+{"id": 130, "date": "2023-05-04", "merchant": "Thames Water", "desc": "THAMES WATER UTIL", "amount": 38.67, "cat": "Bills", "year": 2023, "month": "May"},
+{"id": 131, "date": "2023-05-05", "merchant": "Council Tax", "desc": "LBHF COUNCIL TAX", "amount": 140.4, "cat": "Bills", "year": 2023, "month": "May"},
+{"id": 132, "date": "2023-05-05", "merchant": "BT Broadband", "desc": "BT GROUP PLC", "amount": 38.06, "cat": "Bills", "year": 2023, "month": "May"},
+{"id": 133, "date": "2023-05-05", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 25.92, "cat": "Transport", "year": 2023, "month": "May"},
+{"id": 134, "date": "2023-05-10", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 22.6, "cat": "Transport", "year": 2023, "month": "May"},
+{"id": 135, "date": "2023-05-10", "merchant": "Vanguard ISA", "desc": "VANGUARD ASSET MGMT", "amount": 261.36, "cat": "Investment", "year": 2023, "month": "May"},
+{"id": 136, "date": "2023-05-10", "merchant": "Sainsburys", "desc": "SAINSBURYS SUPERSTORE", "amount": 57.43, "cat": "Groceries", "year": 2023, "month": "May"},
+{"id": 137, "date": "2023-05-12", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 14.71, "cat": "Transport", "year": 2023, "month": "May"},
+{"id": 138, "date": "2023-05-17", "merchant": "ASDA", "desc": "ASDA STORES 4766", "amount": 69.08, "cat": "Groceries", "year": 2023, "month": "May"},
+{"id": 139, "date": "2023-05-18", "merchant": "Costa Coffee", "desc": "COSTA COFFEE 091", "amount": 7.32, "cat": "Eating Out", "year": 2023, "month": "May"},
+{"id": 140, "date": "2023-05-21", "merchant": "Pret A Manger", "desc": "PRET A MANGER LTD", "amount": 39.33, "cat": "Eating Out", "year": 2023, "month": "May"},
+{"id": 141, "date": "2023-05-22", "merchant": "Tesco", "desc": "TESCO STORES 3321", "amount": 80.74, "cat": "Groceries", "year": 2023, "month": "May"},
+{"id": 142, "date": "2023-05-22", "merchant": "Shell Petrol", "desc": "SHELL PETROL STATION", "amount": 9.24, "cat": "Transport", "year": 2023, "month": "May"},
+{"id": 143, "date": "2023-05-23", "merchant": "McDonald's", "desc": "MCDONALDS 6482", "amount": 36.83, "cat": "Eating Out", "year": 2023, "month": "May"},
+{"id": 144, "date": "2023-05-24", "merchant": "Pret A Manger", "desc": "PRET A MANGER LTD", "amount": 21.58, "cat": "Eating Out", "year": 2023, "month": "May"},
+{"id": 145, "date": "2023-05-24", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 11.88, "cat": "Transport", "year": 2023, "month": "May"},
+{"id": 147, "date": "2023-05-26", "merchant": "John Lewis", "desc": "JOHN LEWIS PLC", "amount": 131.14, "cat": "Shopping", "year": 2023, "month": "May"},
+{"id": 148, "date": "2023-05-27", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 22.83, "cat": "Transport", "year": 2023, "month": "May"},
+{"id": 149, "date": "2023-05-28", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 24.73, "cat": "Transport", "year": 2023, "month": "May"},
+{"id": 150, "date": "2023-05-28", "merchant": "Shell Petrol", "desc": "SHELL PETROL STATION", "amount": 12.29, "cat": "Transport", "year": 2023, "month": "May"},
+{"id": 151, "date": "2023-06-01", "merchant": "PureGym", "desc": "PUREGYM LIMITED", "amount": 24.99, "cat": "Health & Beauty", "year": 2023, "month": "Jun"},
+{"id": 152, "date": "2023-06-01", "merchant": "British Gas", "desc": "BRITISH GAS SERVICES", "amount": 54.87, "cat": "Bills", "year": 2023, "month": "Jun"},
+{"id": 153, "date": "2023-06-01", "merchant": "Netflix", "desc": "NETFLIX.COM", "amount": 15.99, "cat": "Entertainment", "year": 2023, "month": "Jun"},
+{"id": 154, "date": "2023-06-01", "merchant": "Rent Payment", "desc": "RENT PAYMENT SO", "amount": 977.86, "cat": "Home & Family", "year": 2023, "month": "Jun"},
+{"id": 155, "date": "2023-06-01", "merchant": "Costa Coffee", "desc": "COSTA COFFEE 091", "amount": 24.16, "cat": "Eating Out", "year": 2023, "month": "Jun"},
+{"id": 156, "date": "2023-06-02", "merchant": "BT Broadband", "desc": "BT GROUP PLC", "amount": 39.78, "cat": "Bills", "year": 2023, "month": "Jun"},
+{"id": 157, "date": "2023-06-02", "merchant": "Thames Water", "desc": "THAMES WATER UTIL", "amount": 33.6, "cat": "Bills", "year": 2023, "month": "Jun"},
+{"id": 158, "date": "2023-06-02", "merchant": "Council Tax", "desc": "LBHF COUNCIL TAX", "amount": 141.19, "cat": "Bills", "year": 2023, "month": "Jun"},
+{"id": 159, "date": "2023-06-03", "merchant": "Sky Sports", "desc": "SKY DIGITAL", "amount": 25.99, "cat": "Entertainment", "year": 2023, "month": "Jun"},
+{"id": 160, "date": "2023-06-03", "merchant": "Lidl", "desc": "LIDL GB GMBH", "amount": 108.49, "cat": "Groceries", "year": 2023, "month": "Jun"},
+{"id": 161, "date": "2023-06-04", "merchant": "EDF Energy", "desc": "EDF ENERGY CUSTOMERS", "amount": 66.8, "cat": "Bills", "year": 2023, "month": "Jun"},
+{"id": 162, "date": "2023-06-05", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 13.78, "cat": "Transport", "year": 2023, "month": "Jun"},
+{"id": 163, "date": "2023-06-07", "merchant": "Spotify", "desc": "SPOTIFY AB", "amount": 9.99, "cat": "Entertainment", "year": 2023, "month": "Jun"},
+{"id": 164, "date": "2023-06-07", "merchant": "John Lewis", "desc": "JOHN LEWIS PLC", "amount": 67.03, "cat": "Shopping", "year": 2023, "month": "Jun"},
+{"id": 165, "date": "2023-06-09", "merchant": "Waitrose", "desc": "WAITROSE & PARTNERS", "amount": 105.14, "cat": "Groceries", "year": 2023, "month": "Jun"},
+{"id": 166, "date": "2023-06-09", "merchant": "Pret A Manger", "desc": "PRET A MANGER LTD", "amount": 8.46, "cat": "Eating Out", "year": 2023, "month": "Jun"},
+{"id": 167, "date": "2023-06-10", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 38.01, "cat": "Transport", "year": 2023, "month": "Jun"},
+{"id": 168, "date": "2023-06-10", "merchant": "IKEA", "desc": "IKEA LTD", "amount": 102.47, "cat": "Home & Family", "year": 2023, "month": "Jun"},
+{"id": 169, "date": "2023-06-12", "merchant": "Vanguard ISA", "desc": "VANGUARD ASSET MGMT", "amount": 246.22, "cat": "Investment", "year": 2023, "month": "Jun"},
+{"id": 170, "date": "2023-06-12", "merchant": "Shell Petrol", "desc": "SHELL PETROL STATION", "amount": 26.0, "cat": "Transport", "year": 2023, "month": "Jun"},
+{"id": 171, "date": "2023-06-13", "merchant": "McDonald's", "desc": "MCDONALDS 6482", "amount": 36.68, "cat": "Eating Out", "year": 2023, "month": "Jun"},
+{"id": 172, "date": "2023-06-13", "merchant": "BP Petrol", "desc": "BP OIL UK LTD", "amount": 39.56, "cat": "Transport", "year": 2023, "month": "Jun"},
+{"id": 173, "date": "2023-06-15", "merchant": "Argos", "desc": "ARGOS LTD", "amount": 68.6, "cat": "Shopping", "year": 2023, "month": "Jun"},
+{"id": 174, "date": "2023-06-16", "merchant": "Tesco", "desc": "TESCO STORES 3321", "amount": 44.29, "cat": "Groceries", "year": 2023, "month": "Jun"},
+{"id": 175, "date": "2023-06-18", "merchant": "Uber", "desc": "UBER *TRIP", "amount": 46.52, "cat": "Transport", "year": 2023, "month": "Jun"},
+{"id": 176, "date": "2023-06-20", "merchant": "BP Petrol", "desc": "BP OIL UK LTD", "amount": 20.01, "cat": "Transport", "year": 2023, "month": "Jun"},
+{"id": 177, "date": "2023-06-20", "merchant": "Costa Coffee", "desc": "COSTA COFFEE 091", "amount": 39.48, "cat": "Eating Out", "year": 2023, "month": "Jun"},
+{"id": 178, "date": "2023-06-20", "merchant": "Shell Petrol", "desc": "SHELL PETROL STATION", "amount": 33.02, "cat": "Transport", "year": 2023, "month": "Jun"},
+{"id": 179, "date": "2023-06-20", "merchant": "Airbnb", "desc": "AIRBNB PAYMENTS", "amount": 224.24, "cat": "Travel", "year": 2023, "month": "Jun"},
+{"id": 180, "date": "2023-06-20", "merchant": "Zara", "desc": "ZARA UK LTD", "amount": 95.8, "cat": "Shopping", "year": 2023, "month": "Jun"},
+{"id": 181, "date": "2023-06-22", "merchant": "ASDA", "desc": "ASDA STORES 4766", "amount": 38.67, "cat": "Groceries", "year": 2023, "month": "Jun"},
+{"id": 182, "date": "2023-06-22", "merchant": "Uber", "desc": "UBER *TRIP", "amount": 42.15, "cat": "Transport", "year": 2023, "month": "Jun"},
+{"id": 183, "date": "2023-06-22", "merchant": "Subway", "desc": "SUBWAY 12340", "amount": 30.74, "cat": "Eating Out", "year": 2023, "month": "Jun"},
+{"id": 184, "date": "2023-06-24", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 49.9, "cat": "Transport", "year": 2023, "month": "Jun"},
+{"id": 185, "date": "2023-06-24", "merchant": "Nando's", "desc": "NANDOS RESTAURANT", "amount": 32.95, "cat": "Eating Out", "year": 2023, "month": "Jun"},
+{"id": 187, "date": "2023-06-26", "merchant": "Superdrug", "desc": "SUPERDRUG STORES", "amount": 41.15, "cat": "Health & Beauty", "year": 2023, "month": "Jun"},
+{"id": 188, "date": "2023-07-01", "merchant": "PureGym", "desc": "PUREGYM LIMITED", "amount": 24.99, "cat": "Health & Beauty", "year": 2023, "month": "Jul"},
+{"id": 189, "date": "2023-07-01", "merchant": "Council Tax", "desc": "LBHF COUNCIL TAX", "amount": 141.64, "cat": "Bills", "year": 2023, "month": "Jul"},
+{"id": 190, "date": "2023-07-01", "merchant": "Rent Payment", "desc": "RENT PAYMENT SO", "amount": 1038.61, "cat": "Home & Family", "year": 2023, "month": "Jul"},
+{"id": 191, "date": "2023-07-01", "merchant": "Airbnb", "desc": "AIRBNB PAYMENTS", "amount": 479.8, "cat": "Travel", "year": 2023, "month": "Jul"},
+{"id": 192, "date": "2023-07-01", "merchant": "Sainsburys", "desc": "SAINSBURYS SUPERSTORE", "amount": 82.48, "cat": "Groceries", "year": 2023, "month": "Jul"},
+{"id": 193, "date": "2023-07-02", "merchant": "British Gas", "desc": "BRITISH GAS SERVICES", "amount": 54.45, "cat": "Bills", "year": 2023, "month": "Jul"},
+{"id": 194, "date": "2023-07-02", "merchant": "Thames Water", "desc": "THAMES WATER UTIL", "amount": 32.2, "cat": "Bills", "year": 2023, "month": "Jul"},
+{"id": 195, "date": "2023-07-02", "merchant": "EDF Energy", "desc": "EDF ENERGY CUSTOMERS", "amount": 71.87, "cat": "Bills", "year": 2023, "month": "Jul"},
+{"id": 196, "date": "2023-07-02", "merchant": "Spotify", "desc": "SPOTIFY AB", "amount": 9.99, "cat": "Entertainment", "year": 2023, "month": "Jul"},
+{"id": 197, "date": "2023-07-03", "merchant": "ASOS", "desc": "ASOS.COM LTD", "amount": 65.1, "cat": "Shopping", "year": 2023, "month": "Jul"},
+{"id": 198, "date": "2023-07-05", "merchant": "BT Broadband", "desc": "BT GROUP PLC", "amount": 44.8, "cat": "Bills", "year": 2023, "month": "Jul"},
+{"id": 199, "date": "2023-07-05", "merchant": "Netflix", "desc": "NETFLIX.COM", "amount": 15.99, "cat": "Entertainment", "year": 2023, "month": "Jul"},
+{"id": 200, "date": "2023-07-06", "merchant": "Sky Sports", "desc": "SKY DIGITAL", "amount": 25.99, "cat": "Entertainment", "year": 2023, "month": "Jul"},
+{"id": 201, "date": "2023-07-06", "merchant": "Uber", "desc": "UBER *TRIP", "amount": 41.93, "cat": "Transport", "year": 2023, "month": "Jul"},
+{"id": 202, "date": "2023-07-08", "merchant": "Tesco", "desc": "TESCO STORES 3321", "amount": 92.27, "cat": "Groceries", "year": 2023, "month": "Jul"},
+{"id": 203, "date": "2023-07-08", "merchant": "BP Petrol", "desc": "BP OIL UK LTD", "amount": 17.86, "cat": "Transport", "year": 2023, "month": "Jul"},
+{"id": 204, "date": "2023-07-13", "merchant": "ASOS", "desc": "ASOS.COM LTD", "amount": 100.83, "cat": "Shopping", "year": 2023, "month": "Jul"},
+{"id": 205, "date": "2023-07-13", "merchant": "Vanguard ISA", "desc": "VANGUARD ASSET MGMT", "amount": 224.16, "cat": "Investment", "year": 2023, "month": "Jul"},
+{"id": 206, "date": "2023-07-14", "merchant": "Superdrug", "desc": "SUPERDRUG STORES", "amount": 8.43, "cat": "Health & Beauty", "year": 2023, "month": "Jul"},
+{"id": 207, "date": "2023-07-15", "merchant": "Uber", "desc": "UBER *TRIP", "amount": 17.22, "cat": "Transport", "year": 2023, "month": "Jul"},
+{"id": 208, "date": "2023-07-15", "merchant": "BP Petrol", "desc": "BP OIL UK LTD", "amount": 7.95, "cat": "Transport", "year": 2023, "month": "Jul"},
+{"id": 209, "date": "2023-07-15", "merchant": "Sainsburys", "desc": "SAINSBURYS SUPERSTORE", "amount": 94.33, "cat": "Groceries", "year": 2023, "month": "Jul"},
+{"id": 210, "date": "2023-07-15", "merchant": "McDonald's", "desc": "MCDONALDS 6482", "amount": 11.4, "cat": "Eating Out", "year": 2023, "month": "Jul"},
+{"id": 211, "date": "2023-07-16", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 35.96, "cat": "Transport", "year": 2023, "month": "Jul"},
+{"id": 212, "date": "2023-07-18", "merchant": "BP Petrol", "desc": "BP OIL UK LTD", "amount": 8.11, "cat": "Transport", "year": 2023, "month": "Jul"},
+{"id": 213, "date": "2023-07-20", "merchant": "Subway", "desc": "SUBWAY 12340", "amount": 17.47, "cat": "Eating Out", "year": 2023, "month": "Jul"},
+{"id": 214, "date": "2023-07-20", "merchant": "Costa Coffee", "desc": "COSTA COFFEE 091", "amount": 33.9, "cat": "Eating Out", "year": 2023, "month": "Jul"},
+{"id": 215, "date": "2023-07-22", "merchant": "Costa Coffee", "desc": "COSTA COFFEE 091", "amount": 24.53, "cat": "Eating Out", "year": 2023, "month": "Jul"},
+{"id": 216, "date": "2023-07-23", "merchant": "Waitrose", "desc": "WAITROSE & PARTNERS", "amount": 34.02, "cat": "Groceries", "year": 2023, "month": "Jul"},
+{"id": 218, "date": "2023-07-27", "merchant": "Uber", "desc": "UBER *TRIP", "amount": 50.25, "cat": "Transport", "year": 2023, "month": "Jul"},
+{"id": 219, "date": "2023-07-27", "merchant": "Shell Petrol", "desc": "SHELL PETROL STATION", "amount": 36.52, "cat": "Transport", "year": 2023, "month": "Jul"},
+{"id": 220, "date": "2023-08-01", "merchant": "Rent Payment", "desc": "RENT PAYMENT SO", "amount": 977.29, "cat": "Home & Family", "year": 2023, "month": "Aug"},
+{"id": 221, "date": "2023-08-01", "merchant": "Uber", "desc": "UBER *TRIP", "amount": 42.2, "cat": "Transport", "year": 2023, "month": "Aug"},
+{"id": 222, "date": "2023-08-01", "merchant": "PureGym", "desc": "PUREGYM LIMITED", "amount": 24.99, "cat": "Health & Beauty", "year": 2023, "month": "Aug"},
+{"id": 223, "date": "2023-08-01", "merchant": "Spotify", "desc": "SPOTIFY AB", "amount": 9.99, "cat": "Entertainment", "year": 2023, "month": "Aug"},
+{"id": 224, "date": "2023-08-02", "merchant": "Pret A Manger", "desc": "PRET A MANGER LTD", "amount": 15.59, "cat": "Eating Out", "year": 2023, "month": "Aug"},
+{"id": 225, "date": "2023-08-02", "merchant": "Council Tax", "desc": "LBHF COUNCIL TAX", "amount": 141.91, "cat": "Bills", "year": 2023, "month": "Aug"},
+{"id": 226, "date": "2023-08-03", "merchant": "British Gas", "desc": "BRITISH GAS SERVICES", "amount": 50.39, "cat": "Bills", "year": 2023, "month": "Aug"},
+{"id": 227, "date": "2023-08-03", "merchant": "Lidl", "desc": "LIDL GB GMBH", "amount": 43.2, "cat": "Groceries", "year": 2023, "month": "Aug"},
+{"id": 228, "date": "2023-08-04", "merchant": "Sky Sports", "desc": "SKY DIGITAL", "amount": 25.99, "cat": "Entertainment", "year": 2023, "month": "Aug"},
+{"id": 229, "date": "2023-08-04", "merchant": "Thames Water", "desc": "THAMES WATER UTIL", "amount": 38.83, "cat": "Bills", "year": 2023, "month": "Aug"},
+{"id": 230, "date": "2023-08-04", "merchant": "Netflix", "desc": "NETFLIX.COM", "amount": 15.99, "cat": "Entertainment", "year": 2023, "month": "Aug"},
+{"id": 231, "date": "2023-08-04", "merchant": "EDF Energy", "desc": "EDF ENERGY CUSTOMERS", "amount": 68.31, "cat": "Bills", "year": 2023, "month": "Aug"},
+{"id": 232, "date": "2023-08-05", "merchant": "BT Broadband", "desc": "BT GROUP PLC", "amount": 44.4, "cat": "Bills", "year": 2023, "month": "Aug"},
+{"id": 233, "date": "2023-08-05", "merchant": "Costa Coffee", "desc": "COSTA COFFEE 091", "amount": 35.61, "cat": "Eating Out", "year": 2023, "month": "Aug"},
+{"id": 234, "date": "2023-08-07", "merchant": "Nando's", "desc": "NANDOS RESTAURANT", "amount": 22.01, "cat": "Eating Out", "year": 2023, "month": "Aug"},
+{"id": 235, "date": "2023-08-08", "merchant": "ASOS", "desc": "ASOS.COM LTD", "amount": 28.16, "cat": "Shopping", "year": 2023, "month": "Aug"},
+{"id": 236, "date": "2023-08-08", "merchant": "Lidl", "desc": "LIDL GB GMBH", "amount": 108.46, "cat": "Groceries", "year": 2023, "month": "Aug"},
+{"id": 237, "date": "2023-08-09", "merchant": "Uber", "desc": "UBER *TRIP", "amount": 46.58, "cat": "Transport", "year": 2023, "month": "Aug"},
+{"id": 238, "date": "2023-08-09", "merchant": "Uber", "desc": "UBER *TRIP", "amount": 42.35, "cat": "Transport", "year": 2023, "month": "Aug"},
+{"id": 239, "date": "2023-08-12", "merchant": "Vanguard ISA", "desc": "VANGUARD ASSET MGMT", "amount": 250.33, "cat": "Investment", "year": 2023, "month": "Aug"},
+{"id": 240, "date": "2023-08-12", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 15.44, "cat": "Transport", "year": 2023, "month": "Aug"},
+{"id": 241, "date": "2023-08-15", "merchant": "Waitrose", "desc": "WAITROSE & PARTNERS", "amount": 102.55, "cat": "Groceries", "year": 2023, "month": "Aug"},
+{"id": 242, "date": "2023-08-20", "merchant": "Airbnb", "desc": "AIRBNB PAYMENTS", "amount": 532.23, "cat": "Travel", "year": 2023, "month": "Aug"},
+{"id": 243, "date": "2023-08-24", "merchant": "Waitrose", "desc": "WAITROSE & PARTNERS", "amount": 83.04, "cat": "Groceries", "year": 2023, "month": "Aug"},
+{"id": 244, "date": "2023-08-25", "merchant": "B&Q", "desc": "B&Q PLC", "amount": 79.02, "cat": "Home & Family", "year": 2023, "month": "Aug"},
+{"id": 245, "date": "2023-08-25", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 52.82, "cat": "Transport", "year": 2023, "month": "Aug"},
+{"id": 246, "date": "2023-08-25", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 5.58, "cat": "Transport", "year": 2023, "month": "Aug"},
+{"id": 247, "date": "2023-08-27", "merchant": "ASOS", "desc": "ASOS.COM LTD", "amount": 14.61, "cat": "Shopping", "year": 2023, "month": "Aug"},
+{"id": 249, "date": "2023-09-01", "merchant": "PureGym", "desc": "PUREGYM LIMITED", "amount": 24.99, "cat": "Health & Beauty", "year": 2023, "month": "Sep"},
+{"id": 250, "date": "2023-09-01", "merchant": "Rent Payment", "desc": "RENT PAYMENT SO", "amount": 1027.25, "cat": "Home & Family", "year": 2023, "month": "Sep"},
+{"id": 251, "date": "2023-09-01", "merchant": "Waitrose", "desc": "WAITROSE & PARTNERS", "amount": 57.78, "cat": "Groceries", "year": 2023, "month": "Sep"},
+{"id": 252, "date": "2023-09-01", "merchant": "British Gas", "desc": "BRITISH GAS SERVICES", "amount": 52.63, "cat": "Bills", "year": 2023, "month": "Sep"},
+{"id": 253, "date": "2023-09-02", "merchant": "BT Broadband", "desc": "BT GROUP PLC", "amount": 38.61, "cat": "Bills", "year": 2023, "month": "Sep"},
+{"id": 254, "date": "2023-09-02", "merchant": "Council Tax", "desc": "LBHF COUNCIL TAX", "amount": 138.82, "cat": "Bills", "year": 2023, "month": "Sep"},
+{"id": 255, "date": "2023-09-03", "merchant": "Thames Water", "desc": "THAMES WATER UTIL", "amount": 36.61, "cat": "Bills", "year": 2023, "month": "Sep"},
+{"id": 256, "date": "2023-09-03", "merchant": "ASOS", "desc": "ASOS.COM LTD", "amount": 42.89, "cat": "Shopping", "year": 2023, "month": "Sep"},
+{"id": 257, "date": "2023-09-04", "merchant": "EDF Energy", "desc": "EDF ENERGY CUSTOMERS", "amount": 67.17, "cat": "Bills", "year": 2023, "month": "Sep"},
+{"id": 258, "date": "2023-09-05", "merchant": "Sky Sports", "desc": "SKY DIGITAL", "amount": 25.99, "cat": "Entertainment", "year": 2023, "month": "Sep"},
+{"id": 259, "date": "2023-09-06", "merchant": "Spotify", "desc": "SPOTIFY AB", "amount": 9.99, "cat": "Entertainment", "year": 2023, "month": "Sep"},
+{"id": 260, "date": "2023-09-07", "merchant": "Netflix", "desc": "NETFLIX.COM", "amount": 15.99, "cat": "Entertainment", "year": 2023, "month": "Sep"},
+{"id": 261, "date": "2023-09-09", "merchant": "John Lewis", "desc": "JOHN LEWIS PLC", "amount": 124.68, "cat": "Shopping", "year": 2023, "month": "Sep"},
+{"id": 262, "date": "2023-09-09", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 48.96, "cat": "Transport", "year": 2023, "month": "Sep"},
+{"id": 263, "date": "2023-09-10", "merchant": "Vanguard ISA", "desc": "VANGUARD ASSET MGMT", "amount": 269.43, "cat": "Investment", "year": 2023, "month": "Sep"},
+{"id": 264, "date": "2023-09-10", "merchant": "Lidl", "desc": "LIDL GB GMBH", "amount": 59.65, "cat": "Groceries", "year": 2023, "month": "Sep"},
+{"id": 265, "date": "2023-09-16", "merchant": "Shell Petrol", "desc": "SHELL PETROL STATION", "amount": 14.82, "cat": "Transport", "year": 2023, "month": "Sep"},
+{"id": 266, "date": "2023-09-16", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 47.4, "cat": "Transport", "year": 2023, "month": "Sep"},
+{"id": 267, "date": "2023-09-17", "merchant": "Waitrose", "desc": "WAITROSE & PARTNERS", "amount": 57.3, "cat": "Groceries", "year": 2023, "month": "Sep"},
+{"id": 268, "date": "2023-09-18", "merchant": "John Lewis", "desc": "JOHN LEWIS PLC", "amount": 13.3, "cat": "Shopping", "year": 2023, "month": "Sep"},
+{"id": 269, "date": "2023-09-20", "merchant": "Nando's", "desc": "NANDOS RESTAURANT", "amount": 33.67, "cat": "Eating Out", "year": 2023, "month": "Sep"},
+{"id": 270, "date": "2023-09-22", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 23.33, "cat": "Transport", "year": 2023, "month": "Sep"},
+{"id": 271, "date": "2023-09-23", "merchant": "Boots", "desc": "BOOTS UK LTD", "amount": 24.57, "cat": "Health & Beauty", "year": 2023, "month": "Sep"},
+{"id": 272, "date": "2023-09-23", "merchant": "Costa Coffee", "desc": "COSTA COFFEE 091", "amount": 12.05, "cat": "Eating Out", "year": 2023, "month": "Sep"},
+{"id": 273, "date": "2023-09-23", "merchant": "Lidl", "desc": "LIDL GB GMBH", "amount": 38.44, "cat": "Groceries", "year": 2023, "month": "Sep"},
+{"id": 274, "date": "2023-09-24", "merchant": "Pret A Manger", "desc": "PRET A MANGER LTD", "amount": 24.22, "cat": "Eating Out", "year": 2023, "month": "Sep"},
+{"id": 275, "date": "2023-09-25", "merchant": "Shell Petrol", "desc": "SHELL PETROL STATION", "amount": 27.7, "cat": "Transport", "year": 2023, "month": "Sep"},
+{"id": 276, "date": "2023-09-25", "merchant": "Subway", "desc": "SUBWAY 12340", "amount": 22.96, "cat": "Eating Out", "year": 2023, "month": "Sep"},
+{"id": 278, "date": "2023-09-27", "merchant": "Costa Coffee", "desc": "COSTA COFFEE 091", "amount": 31.12, "cat": "Eating Out", "year": 2023, "month": "Sep"},
+{"id": 279, "date": "2023-09-28", "merchant": "BP Petrol", "desc": "BP OIL UK LTD", "amount": 16.52, "cat": "Transport", "year": 2023, "month": "Sep"},
+{"id": 280, "date": "2023-10-01", "merchant": "PureGym", "desc": "PUREGYM LIMITED", "amount": 24.99, "cat": "Health & Beauty", "year": 2023, "month": "Oct"},
+{"id": 281, "date": "2023-10-01", "merchant": "Netflix", "desc": "NETFLIX.COM", "amount": 15.99, "cat": "Entertainment", "year": 2023, "month": "Oct"},
+{"id": 282, "date": "2023-10-01", "merchant": "Rent Payment", "desc": "RENT PAYMENT SO", "amount": 975.14, "cat": "Home & Family", "year": 2023, "month": "Oct"},
+{"id": 283, "date": "2023-10-02", "merchant": "Sky Sports", "desc": "SKY DIGITAL", "amount": 25.99, "cat": "Entertainment", "year": 2023, "month": "Oct"},
+{"id": 284, "date": "2023-10-03", "merchant": "BP Petrol", "desc": "BP OIL UK LTD", "amount": 54.69, "cat": "Transport", "year": 2023, "month": "Oct"},
+{"id": 285, "date": "2023-10-03", "merchant": "Waitrose", "desc": "WAITROSE & PARTNERS", "amount": 44.81, "cat": "Groceries", "year": 2023, "month": "Oct"},
+{"id": 286, "date": "2023-10-04", "merchant": "Council Tax", "desc": "LBHF COUNCIL TAX", "amount": 140.17, "cat": "Bills", "year": 2023, "month": "Oct"},
+{"id": 287, "date": "2023-10-04", "merchant": "EDF Energy", "desc": "EDF ENERGY CUSTOMERS", "amount": 71.97, "cat": "Bills", "year": 2023, "month": "Oct"},
+{"id": 288, "date": "2023-10-04", "merchant": "Costa Coffee", "desc": "COSTA COFFEE 091", "amount": 35.8, "cat": "Eating Out", "year": 2023, "month": "Oct"},
+{"id": 289, "date": "2023-10-05", "merchant": "Thames Water", "desc": "THAMES WATER UTIL", "amount": 36.25, "cat": "Bills", "year": 2023, "month": "Oct"},
+{"id": 290, "date": "2023-10-05", "merchant": "British Gas", "desc": "BRITISH GAS SERVICES", "amount": 50.95, "cat": "Bills", "year": 2023, "month": "Oct"},
+{"id": 291, "date": "2023-10-05", "merchant": "BT Broadband", "desc": "BT GROUP PLC", "amount": 40.65, "cat": "Bills", "year": 2023, "month": "Oct"},
+{"id": 292, "date": "2023-10-05", "merchant": "Subway", "desc": "SUBWAY 12340", "amount": 16.05, "cat": "Eating Out", "year": 2023, "month": "Oct"},
+{"id": 293, "date": "2023-10-05", "merchant": "Shell Petrol", "desc": "SHELL PETROL STATION", "amount": 45.37, "cat": "Transport", "year": 2023, "month": "Oct"},
+{"id": 294, "date": "2023-10-06", "merchant": "Spotify", "desc": "SPOTIFY AB", "amount": 9.99, "cat": "Entertainment", "year": 2023, "month": "Oct"},
+{"id": 295, "date": "2023-10-06", "merchant": "BP Petrol", "desc": "BP OIL UK LTD", "amount": 53.24, "cat": "Transport", "year": 2023, "month": "Oct"},
+{"id": 296, "date": "2023-10-10", "merchant": "Argos", "desc": "ARGOS LTD", "amount": 122.1, "cat": "Shopping", "year": 2023, "month": "Oct"},
+{"id": 297, "date": "2023-10-10", "merchant": "Pret A Manger", "desc": "PRET A MANGER LTD", "amount": 7.47, "cat": "Eating Out", "year": 2023, "month": "Oct"},
+{"id": 298, "date": "2023-10-10", "merchant": "Sainsburys", "desc": "SAINSBURYS SUPERSTORE", "amount": 68.74, "cat": "Groceries", "year": 2023, "month": "Oct"},
+{"id": 299, "date": "2023-10-12", "merchant": "Vanguard ISA", "desc": "VANGUARD ASSET MGMT", "amount": 167.93, "cat": "Investment", "year": 2023, "month": "Oct"},
+{"id": 301, "date": "2023-10-13", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 29.08, "cat": "Transport", "year": 2023, "month": "Oct"},
+{"id": 302, "date": "2023-10-13", "merchant": "Zara", "desc": "ZARA UK LTD", "amount": 69.67, "cat": "Shopping", "year": 2023, "month": "Oct"},
+{"id": 303, "date": "2023-10-16", "merchant": "BP Petrol", "desc": "BP OIL UK LTD", "amount": 28.41, "cat": "Transport", "year": 2023, "month": "Oct"},
+{"id": 304, "date": "2023-10-17", "merchant": "Waitrose", "desc": "WAITROSE & PARTNERS", "amount": 77.74, "cat": "Groceries", "year": 2023, "month": "Oct"},
+{"id": 305, "date": "2023-10-18", "merchant": "McDonald's", "desc": "MCDONALDS 6482", "amount": 16.64, "cat": "Eating Out", "year": 2023, "month": "Oct"},
+{"id": 306, "date": "2023-10-18", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 42.99, "cat": "Transport", "year": 2023, "month": "Oct"},
+{"id": 307, "date": "2023-10-20", "merchant": "British Red Cross", "desc": "BRITISH RED CROSS", "amount": 24.2, "cat": "Charity", "year": 2023, "month": "Oct"},
+{"id": 308, "date": "2023-10-21", "merchant": "IKEA", "desc": "IKEA LTD", "amount": 53.76, "cat": "Home & Family", "year": 2023, "month": "Oct"},
+{"id": 309, "date": "2023-10-21", "merchant": "Pret A Manger", "desc": "PRET A MANGER LTD", "amount": 35.66, "cat": "Eating Out", "year": 2023, "month": "Oct"},
+{"id": 310, "date": "2023-10-21", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 39.01, "cat": "Transport", "year": 2023, "month": "Oct"},
+{"id": 311, "date": "2023-10-22", "merchant": "Tesco", "desc": "TESCO STORES 3321", "amount": 53.7, "cat": "Groceries", "year": 2023, "month": "Oct"},
+{"id": 313, "date": "2023-10-28", "merchant": "BP Petrol", "desc": "BP OIL UK LTD", "amount": 28.36, "cat": "Transport", "year": 2023, "month": "Oct"},
+{"id": 314, "date": "2023-11-01", "merchant": "PureGym", "desc": "PUREGYM LIMITED", "amount": 24.99, "cat": "Health & Beauty", "year": 2023, "month": "Nov"},
+{"id": 315, "date": "2023-11-01", "merchant": "EDF Energy", "desc": "EDF ENERGY CUSTOMERS", "amount": 65.85, "cat": "Bills", "year": 2023, "month": "Nov"},
+{"id": 316, "date": "2023-11-01", "merchant": "Rent Payment", "desc": "RENT PAYMENT SO", "amount": 973.34, "cat": "Home & Family", "year": 2023, "month": "Nov"},
+{"id": 317, "date": "2023-11-01", "merchant": "British Gas", "desc": "BRITISH GAS SERVICES", "amount": 51.27, "cat": "Bills", "year": 2023, "month": "Nov"},
+{"id": 318, "date": "2023-11-02", "merchant": "Sainsburys", "desc": "SAINSBURYS SUPERSTORE", "amount": 39.18, "cat": "Groceries", "year": 2023, "month": "Nov"},
+{"id": 319, "date": "2023-11-03", "merchant": "BT Broadband", "desc": "BT GROUP PLC", "amount": 43.62, "cat": "Bills", "year": 2023, "month": "Nov"},
+{"id": 320, "date": "2023-11-03", "merchant": "Netflix", "desc": "NETFLIX.COM", "amount": 15.99, "cat": "Entertainment", "year": 2023, "month": "Nov"},
+{"id": 321, "date": "2023-11-03", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 15.68, "cat": "Transport", "year": 2023, "month": "Nov"},
+{"id": 322, "date": "2023-11-03", "merchant": "Costa Coffee", "desc": "COSTA COFFEE 091", "amount": 26.74, "cat": "Eating Out", "year": 2023, "month": "Nov"},
+{"id": 323, "date": "2023-11-04", "merchant": "Council Tax", "desc": "LBHF COUNCIL TAX", "amount": 138.57, "cat": "Bills", "year": 2023, "month": "Nov"},
+{"id": 324, "date": "2023-11-04", "merchant": "Costa Coffee", "desc": "COSTA COFFEE 091", "amount": 22.47, "cat": "Eating Out", "year": 2023, "month": "Nov"},
+{"id": 325, "date": "2023-11-05", "merchant": "Thames Water", "desc": "THAMES WATER UTIL", "amount": 35.76, "cat": "Bills", "year": 2023, "month": "Nov"},
+{"id": 326, "date": "2023-11-07", "merchant": "Spotify", "desc": "SPOTIFY AB", "amount": 9.99, "cat": "Entertainment", "year": 2023, "month": "Nov"},
+{"id": 327, "date": "2023-11-07", "merchant": "Sky Sports", "desc": "SKY DIGITAL", "amount": 25.99, "cat": "Entertainment", "year": 2023, "month": "Nov"},
+{"id": 329, "date": "2023-11-09", "merchant": "Uber", "desc": "UBER *TRIP", "amount": 13.26, "cat": "Transport", "year": 2023, "month": "Nov"},
+{"id": 330, "date": "2023-11-10", "merchant": "Argos", "desc": "ARGOS LTD", "amount": 96.81, "cat": "Shopping", "year": 2023, "month": "Nov"},
+{"id": 331, "date": "2023-11-10", "merchant": "Sainsburys", "desc": "SAINSBURYS SUPERSTORE", "amount": 41.92, "cat": "Groceries", "year": 2023, "month": "Nov"},
+{"id": 332, "date": "2023-11-11", "merchant": "John Lewis", "desc": "JOHN LEWIS PLC", "amount": 97.78, "cat": "Shopping", "year": 2023, "month": "Nov"},
+{"id": 333, "date": "2023-11-11", "merchant": "ASOS", "desc": "ASOS.COM LTD", "amount": 64.69, "cat": "Shopping", "year": 2023, "month": "Nov"},
+{"id": 334, "date": "2023-11-14", "merchant": "Vanguard ISA", "desc": "VANGUARD ASSET MGMT", "amount": 249.18, "cat": "Investment", "year": 2023, "month": "Nov"},
+{"id": 335, "date": "2023-11-14", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 36.37, "cat": "Transport", "year": 2023, "month": "Nov"},
+{"id": 336, "date": "2023-11-15", "merchant": "Boots", "desc": "BOOTS UK LTD", "amount": 9.43, "cat": "Health & Beauty", "year": 2023, "month": "Nov"},
+{"id": 337, "date": "2023-11-15", "merchant": "ASDA", "desc": "ASDA STORES 4766", "amount": 35.71, "cat": "Groceries", "year": 2023, "month": "Nov"},
+{"id": 338, "date": "2023-11-16", "merchant": "Amazon", "desc": "AMAZON UK RETAIL", "amount": 56.54, "cat": "Shopping", "year": 2023, "month": "Nov"},
+{"id": 339, "date": "2023-11-16", "merchant": "Shell Petrol", "desc": "SHELL PETROL STATION", "amount": 30.47, "cat": "Transport", "year": 2023, "month": "Nov"},
+{"id": 340, "date": "2023-11-17", "merchant": "Nando's", "desc": "NANDOS RESTAURANT", "amount": 24.82, "cat": "Eating Out", "year": 2023, "month": "Nov"},
+{"id": 341, "date": "2023-11-19", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 52.49, "cat": "Transport", "year": 2023, "month": "Nov"},
+{"id": 342, "date": "2023-11-19", "merchant": "BP Petrol", "desc": "BP OIL UK LTD", "amount": 6.05, "cat": "Transport", "year": 2023, "month": "Nov"},
+{"id": 343, "date": "2023-11-23", "merchant": "Sainsburys", "desc": "SAINSBURYS SUPERSTORE", "amount": 77.6, "cat": "Groceries", "year": 2023, "month": "Nov"},
+{"id": 344, "date": "2023-11-23", "merchant": "Nando's", "desc": "NANDOS RESTAURANT", "amount": 20.28, "cat": "Eating Out", "year": 2023, "month": "Nov"},
+{"id": 345, "date": "2023-11-24", "merchant": "Costa Coffee", "desc": "COSTA COFFEE 091", "amount": 17.64, "cat": "Eating Out", "year": 2023, "month": "Nov"},
+{"id": 346, "date": "2023-11-25", "merchant": "British Red Cross", "desc": "BRITISH RED CROSS", "amount": 13.08, "cat": "Charity", "year": 2023, "month": "Nov"},
+{"id": 348, "date": "2023-12-01", "merchant": "Rent Payment", "desc": "RENT PAYMENT SO", "amount": 993.81, "cat": "Home & Family", "year": 2023, "month": "Dec"},
+{"id": 349, "date": "2023-12-01", "merchant": "Waitrose", "desc": "WAITROSE & PARTNERS", "amount": 86.78, "cat": "Groceries", "year": 2023, "month": "Dec"},
+{"id": 350, "date": "2023-12-01", "merchant": "PureGym", "desc": "PUREGYM LIMITED", "amount": 24.99, "cat": "Health & Beauty", "year": 2023, "month": "Dec"},
+{"id": 351, "date": "2023-12-01", "merchant": "Sky Sports", "desc": "SKY DIGITAL", "amount": 25.99, "cat": "Entertainment", "year": 2023, "month": "Dec"},
+{"id": 352, "date": "2023-12-02", "merchant": "Argos", "desc": "ARGOS LTD", "amount": 52.73, "cat": "Shopping", "year": 2023, "month": "Dec"},
+{"id": 353, "date": "2023-12-02", "merchant": "BT Broadband", "desc": "BT GROUP PLC", "amount": 40.14, "cat": "Bills", "year": 2023, "month": "Dec"},
+{"id": 354, "date": "2023-12-02", "merchant": "British Gas", "desc": "BRITISH GAS SERVICES", "amount": 52.15, "cat": "Bills", "year": 2023, "month": "Dec"},
+{"id": 355, "date": "2023-12-02", "merchant": "Council Tax", "desc": "LBHF COUNCIL TAX", "amount": 145.42, "cat": "Bills", "year": 2023, "month": "Dec"},
+{"id": 356, "date": "2023-12-04", "merchant": "EDF Energy", "desc": "EDF ENERGY CUSTOMERS", "amount": 70.08, "cat": "Bills", "year": 2023, "month": "Dec"},
+{"id": 357, "date": "2023-12-04", "merchant": "Spotify", "desc": "SPOTIFY AB", "amount": 9.99, "cat": "Entertainment", "year": 2023, "month": "Dec"},
+{"id": 358, "date": "2023-12-05", "merchant": "Thames Water", "desc": "THAMES WATER UTIL", "amount": 38.05, "cat": "Bills", "year": 2023, "month": "Dec"},
+{"id": 359, "date": "2023-12-06", "merchant": "Netflix", "desc": "NETFLIX.COM", "amount": 15.99, "cat": "Entertainment", "year": 2023, "month": "Dec"},
+{"id": 360, "date": "2023-12-08", "merchant": "Costa Coffee", "desc": "COSTA COFFEE 091", "amount": 22.07, "cat": "Eating Out", "year": 2023, "month": "Dec"},
+{"id": 361, "date": "2023-12-09", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 43.41, "cat": "Transport", "year": 2023, "month": "Dec"},
+{"id": 362, "date": "2023-12-09", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 45.85, "cat": "Transport", "year": 2023, "month": "Dec"},
+{"id": 363, "date": "2023-12-10", "merchant": "Vanguard ISA", "desc": "VANGUARD ASSET MGMT", "amount": 295.97, "cat": "Investment", "year": 2023, "month": "Dec"},
+{"id": 364, "date": "2023-12-10", "merchant": "ASDA", "desc": "ASDA STORES 4766", "amount": 31.09, "cat": "Groceries", "year": 2023, "month": "Dec"},
+{"id": 365, "date": "2023-12-11", "merchant": "Uber", "desc": "UBER *TRIP", "amount": 51.65, "cat": "Transport", "year": 2023, "month": "Dec"},
+{"id": 366, "date": "2023-12-11", "merchant": "Argos", "desc": "ARGOS LTD", "amount": 123.31, "cat": "Shopping", "year": 2023, "month": "Dec"},
+{"id": 367, "date": "2023-12-13", "merchant": "Pret A Manger", "desc": "PRET A MANGER LTD", "amount": 13.29, "cat": "Eating Out", "year": 2023, "month": "Dec"},
+{"id": 368, "date": "2023-12-14", "merchant": "Nando's", "desc": "NANDOS RESTAURANT", "amount": 34.55, "cat": "Eating Out", "year": 2023, "month": "Dec"},
+{"id": 369, "date": "2023-12-15", "merchant": "Lidl", "desc": "LIDL GB GMBH", "amount": 47.98, "cat": "Groceries", "year": 2023, "month": "Dec"},
+{"id": 370, "date": "2023-12-16", "merchant": "Boots", "desc": "BOOTS UK LTD", "amount": 43.63, "cat": "Health & Beauty", "year": 2023, "month": "Dec"},
+{"id": 371, "date": "2023-12-16", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 21.6, "cat": "Transport", "year": 2023, "month": "Dec"},
+{"id": 372, "date": "2023-12-17", "merchant": "Booking.com", "desc": "BOOKING.COM", "amount": 506.12, "cat": "Travel", "year": 2023, "month": "Dec"},
+{"id": 373, "date": "2023-12-19", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 54.94, "cat": "Transport", "year": 2023, "month": "Dec"},
+{"id": 374, "date": "2023-12-19", "merchant": "ASOS", "desc": "ASOS.COM LTD", "amount": 61.02, "cat": "Shopping", "year": 2023, "month": "Dec"},
+{"id": 375, "date": "2023-12-23", "merchant": "Costa Coffee", "desc": "COSTA COFFEE 091", "amount": 16.63, "cat": "Eating Out", "year": 2023, "month": "Dec"},
+{"id": 376, "date": "2023-12-23", "merchant": "Tesco", "desc": "TESCO STORES 3321", "amount": 105.76, "cat": "Groceries", "year": 2023, "month": "Dec"},
+{"id": 377, "date": "2023-12-23", "merchant": "Argos", "desc": "ARGOS LTD", "amount": 128.92, "cat": "Shopping", "year": 2023, "month": "Dec"},
+{"id": 378, "date": "2023-12-24", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 48.85, "cat": "Transport", "year": 2023, "month": "Dec"},
+{"id": 379, "date": "2023-12-24", "merchant": "BP Petrol", "desc": "BP OIL UK LTD", "amount": 19.23, "cat": "Transport", "year": 2023, "month": "Dec"},
+{"id": 380, "date": "2023-12-28", "merchant": "Uber", "desc": "UBER *TRIP", "amount": 11.58, "cat": "Transport", "year": 2023, "month": "Dec"},
+{"id": 382, "date": "2023-12-28", "merchant": "Oxfam", "desc": "OXFAM DONATION", "amount": 7.01, "cat": "Charity", "year": 2023, "month": "Dec"},
+{"id": 383, "date": "2024-01-01", "merchant": "Tesco", "desc": "TESCO STORES 3321", "amount": 80.49, "cat": "Groceries", "year": 2024, "month": "Jan"},
+{"id": 384, "date": "2024-01-01", "merchant": "PureGym", "desc": "PUREGYM LIMITED", "amount": 24.99, "cat": "Health & Beauty", "year": 2024, "month": "Jan"},
+{"id": 385, "date": "2024-01-01", "merchant": "Rent Payment", "desc": "RENT PAYMENT SO", "amount": 981.67, "cat": "Home & Family", "year": 2024, "month": "Jan"},
+{"id": 386, "date": "2024-01-02", "merchant": "McDonald's", "desc": "MCDONALDS 6482", "amount": 17.7, "cat": "Eating Out", "year": 2024, "month": "Jan"},
+{"id": 387, "date": "2024-01-02", "merchant": "British Gas", "desc": "BRITISH GAS SERVICES", "amount": 48.6, "cat": "Bills", "year": 2024, "month": "Jan"},
+{"id": 388, "date": "2024-01-03", "merchant": "BT Broadband", "desc": "BT GROUP PLC", "amount": 44.82, "cat": "Bills", "year": 2024, "month": "Jan"},
+{"id": 389, "date": "2024-01-03", "merchant": "Shell Petrol", "desc": "SHELL PETROL STATION", "amount": 26.53, "cat": "Transport", "year": 2024, "month": "Jan"},
+{"id": 390, "date": "2024-01-03", "merchant": "Thames Water", "desc": "THAMES WATER UTIL", "amount": 34.71, "cat": "Bills", "year": 2024, "month": "Jan"},
+{"id": 391, "date": "2024-01-04", "merchant": "Sky Sports", "desc": "SKY DIGITAL", "amount": 25.99, "cat": "Entertainment", "year": 2024, "month": "Jan"},
+{"id": 392, "date": "2024-01-04", "merchant": "EDF Energy", "desc": "EDF ENERGY CUSTOMERS", "amount": 69.2, "cat": "Bills", "year": 2024, "month": "Jan"},
+{"id": 393, "date": "2024-01-05", "merchant": "Council Tax", "desc": "LBHF COUNCIL TAX", "amount": 141.04, "cat": "Bills", "year": 2024, "month": "Jan"},
+{"id": 394, "date": "2024-01-05", "merchant": "Costa Coffee", "desc": "COSTA COFFEE 091", "amount": 15.06, "cat": "Eating Out", "year": 2024, "month": "Jan"},
+{"id": 395, "date": "2024-01-06", "merchant": "Netflix", "desc": "NETFLIX.COM", "amount": 15.99, "cat": "Entertainment", "year": 2024, "month": "Jan"},
+{"id": 396, "date": "2024-01-06", "merchant": "Pret A Manger", "desc": "PRET A MANGER LTD", "amount": 12.78, "cat": "Eating Out", "year": 2024, "month": "Jan"},
+{"id": 397, "date": "2024-01-07", "merchant": "Spotify", "desc": "SPOTIFY AB", "amount": 9.99, "cat": "Entertainment", "year": 2024, "month": "Jan"},
+{"id": 398, "date": "2024-01-08", "merchant": "Amazon", "desc": "AMAZON UK RETAIL", "amount": 60.81, "cat": "Shopping", "year": 2024, "month": "Jan"},
+{"id": 399, "date": "2024-01-08", "merchant": "ASDA", "desc": "ASDA STORES 4766", "amount": 89.74, "cat": "Groceries", "year": 2024, "month": "Jan"},
+{"id": 400, "date": "2024-01-09", "merchant": "Oxfam", "desc": "OXFAM DONATION", "amount": 5.16, "cat": "Charity", "year": 2024, "month": "Jan"},
+{"id": 401, "date": "2024-01-10", "merchant": "McDonald's", "desc": "MCDONALDS 6482", "amount": 18.83, "cat": "Eating Out", "year": 2024, "month": "Jan"},
+{"id": 402, "date": "2024-01-10", "merchant": "Uber", "desc": "UBER *TRIP", "amount": 38.56, "cat": "Transport", "year": 2024, "month": "Jan"},
+{"id": 403, "date": "2024-01-13", "merchant": "ASOS", "desc": "ASOS.COM LTD", "amount": 121.23, "cat": "Shopping", "year": 2024, "month": "Jan"},
+{"id": 404, "date": "2024-01-14", "merchant": "Vanguard ISA", "desc": "VANGUARD ASSET MGMT", "amount": 155.38, "cat": "Investment", "year": 2024, "month": "Jan"},
+{"id": 405, "date": "2024-01-15", "merchant": "Lidl", "desc": "LIDL GB GMBH", "amount": 90.83, "cat": "Groceries", "year": 2024, "month": "Jan"},
+{"id": 406, "date": "2024-01-19", "merchant": "John Lewis", "desc": "JOHN LEWIS PLC", "amount": 49.87, "cat": "Shopping", "year": 2024, "month": "Jan"},
+{"id": 407, "date": "2024-01-19", "merchant": "Costa Coffee", "desc": "COSTA COFFEE 091", "amount": 29.5, "cat": "Eating Out", "year": 2024, "month": "Jan"},
+{"id": 408, "date": "2024-01-19", "merchant": "Uber", "desc": "UBER *TRIP", "amount": 11.3, "cat": "Transport", "year": 2024, "month": "Jan"},
+{"id": 409, "date": "2024-01-19", "merchant": "BP Petrol", "desc": "BP OIL UK LTD", "amount": 19.26, "cat": "Transport", "year": 2024, "month": "Jan"},
+{"id": 410, "date": "2024-01-20", "merchant": "Uber", "desc": "UBER *TRIP", "amount": 38.84, "cat": "Transport", "year": 2024, "month": "Jan"},
+{"id": 411, "date": "2024-01-21", "merchant": "Uber", "desc": "UBER *TRIP", "amount": 16.95, "cat": "Transport", "year": 2024, "month": "Jan"},
+{"id": 412, "date": "2024-01-22", "merchant": "BP Petrol", "desc": "BP OIL UK LTD", "amount": 4.48, "cat": "Transport", "year": 2024, "month": "Jan"},
+{"id": 413, "date": "2024-01-23", "merchant": "Tesco", "desc": "TESCO STORES 3321", "amount": 43.31, "cat": "Groceries", "year": 2024, "month": "Jan"},
+{"id": 414, "date": "2024-01-23", "merchant": "Uber", "desc": "UBER *TRIP", "amount": 16.76, "cat": "Transport", "year": 2024, "month": "Jan"},
+{"id": 416, "date": "2024-02-01", "merchant": "Argos", "desc": "ARGOS LTD", "amount": 91.3, "cat": "Shopping", "year": 2024, "month": "Feb"},
+{"id": 417, "date": "2024-02-01", "merchant": "Rent Payment", "desc": "RENT PAYMENT SO", "amount": 1017.78, "cat": "Home & Family", "year": 2024, "month": "Feb"},
+{"id": 418, "date": "2024-02-01", "merchant": "PureGym", "desc": "PUREGYM LIMITED", "amount": 24.99, "cat": "Health & Beauty", "year": 2024, "month": "Feb"},
+{"id": 419, "date": "2024-02-02", "merchant": "Tesco", "desc": "TESCO STORES 3321", "amount": 93.09, "cat": "Groceries", "year": 2024, "month": "Feb"},
+{"id": 420, "date": "2024-02-02", "merchant": "EDF Energy", "desc": "EDF ENERGY CUSTOMERS", "amount": 68.86, "cat": "Bills", "year": 2024, "month": "Feb"},
+{"id": 421, "date": "2024-02-02", "merchant": "Council Tax", "desc": "LBHF COUNCIL TAX", "amount": 142.97, "cat": "Bills", "year": 2024, "month": "Feb"},
+{"id": 422, "date": "2024-02-03", "merchant": "Thames Water", "desc": "THAMES WATER UTIL", "amount": 38.21, "cat": "Bills", "year": 2024, "month": "Feb"},
+{"id": 423, "date": "2024-02-03", "merchant": "BT Broadband", "desc": "BT GROUP PLC", "amount": 39.75, "cat": "Bills", "year": 2024, "month": "Feb"},
+{"id": 424, "date": "2024-02-03", "merchant": "BP Petrol", "desc": "BP OIL UK LTD", "amount": 44.32, "cat": "Transport", "year": 2024, "month": "Feb"},
+{"id": 425, "date": "2024-02-04", "merchant": "British Gas", "desc": "BRITISH GAS SERVICES", "amount": 54.66, "cat": "Bills", "year": 2024, "month": "Feb"},
+{"id": 426, "date": "2024-02-04", "merchant": "John Lewis", "desc": "JOHN LEWIS PLC", "amount": 98.38, "cat": "Shopping", "year": 2024, "month": "Feb"},
+{"id": 427, "date": "2024-02-06", "merchant": "Netflix", "desc": "NETFLIX.COM", "amount": 15.99, "cat": "Entertainment", "year": 2024, "month": "Feb"},
+{"id": 428, "date": "2024-02-06", "merchant": "Sky Sports", "desc": "SKY DIGITAL", "amount": 25.99, "cat": "Entertainment", "year": 2024, "month": "Feb"},
+{"id": 429, "date": "2024-02-07", "merchant": "Spotify", "desc": "SPOTIFY AB", "amount": 9.99, "cat": "Entertainment", "year": 2024, "month": "Feb"},
+{"id": 430, "date": "2024-02-09", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 31.37, "cat": "Transport", "year": 2024, "month": "Feb"},
+{"id": 431, "date": "2024-02-10", "merchant": "Tesco", "desc": "TESCO STORES 3321", "amount": 59.19, "cat": "Groceries", "year": 2024, "month": "Feb"},
+{"id": 432, "date": "2024-02-11", "merchant": "Vanguard ISA", "desc": "VANGUARD ASSET MGMT", "amount": 244.24, "cat": "Investment", "year": 2024, "month": "Feb"},
+{"id": 433, "date": "2024-02-12", "merchant": "Uber", "desc": "UBER *TRIP", "amount": 38.31, "cat": "Transport", "year": 2024, "month": "Feb"},
+{"id": 434, "date": "2024-02-13", "merchant": "Zara", "desc": "ZARA UK LTD", "amount": 117.27, "cat": "Shopping", "year": 2024, "month": "Feb"},
+{"id": 435, "date": "2024-02-15", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 53.11, "cat": "Transport", "year": 2024, "month": "Feb"},
+{"id": 436, "date": "2024-02-15", "merchant": "Sainsburys", "desc": "SAINSBURYS SUPERSTORE", "amount": 102.77, "cat": "Groceries", "year": 2024, "month": "Feb"},
+{"id": 437, "date": "2024-02-17", "merchant": "Nando's", "desc": "NANDOS RESTAURANT", "amount": 23.56, "cat": "Eating Out", "year": 2024, "month": "Feb"},
+{"id": 438, "date": "2024-02-21", "merchant": "British Red Cross", "desc": "BRITISH RED CROSS", "amount": 6.26, "cat": "Charity", "year": 2024, "month": "Feb"},
+{"id": 439, "date": "2024-02-24", "merchant": "ASDA", "desc": "ASDA STORES 4766", "amount": 63.24, "cat": "Groceries", "year": 2024, "month": "Feb"},
+{"id": 441, "date": "2024-02-25", "merchant": "Shell Petrol", "desc": "SHELL PETROL STATION", "amount": 53.29, "cat": "Transport", "year": 2024, "month": "Feb"},
+{"id": 442, "date": "2024-02-26", "merchant": "Costa Coffee", "desc": "COSTA COFFEE 091", "amount": 16.74, "cat": "Eating Out", "year": 2024, "month": "Feb"},
+{"id": 443, "date": "2024-02-26", "merchant": "Pret A Manger", "desc": "PRET A MANGER LTD", "amount": 24.8, "cat": "Eating Out", "year": 2024, "month": "Feb"},
+{"id": 444, "date": "2024-02-27", "merchant": "Nando's", "desc": "NANDOS RESTAURANT", "amount": 12.43, "cat": "Eating Out", "year": 2024, "month": "Feb"},
+{"id": 445, "date": "2024-02-28", "merchant": "Uber", "desc": "UBER *TRIP", "amount": 45.03, "cat": "Transport", "year": 2024, "month": "Feb"},
+{"id": 446, "date": "2024-03-01", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 6.58, "cat": "Transport", "year": 2024, "month": "Mar"},
+{"id": 447, "date": "2024-03-01", "merchant": "British Gas", "desc": "BRITISH GAS SERVICES", "amount": 49.12, "cat": "Bills", "year": 2024, "month": "Mar"},
+{"id": 448, "date": "2024-03-01", "merchant": "Thames Water", "desc": "THAMES WATER UTIL", "amount": 34.43, "cat": "Bills", "year": 2024, "month": "Mar"},
+{"id": 449, "date": "2024-03-01", "merchant": "Oxfam", "desc": "OXFAM DONATION", "amount": 8.48, "cat": "Charity", "year": 2024, "month": "Mar"},
+{"id": 450, "date": "2024-03-01", "merchant": "Rent Payment", "desc": "RENT PAYMENT SO", "amount": 987.1, "cat": "Home & Family", "year": 2024, "month": "Mar"},
+{"id": 451, "date": "2024-03-01", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 18.14, "cat": "Transport", "year": 2024, "month": "Mar"},
+{"id": 452, "date": "2024-03-01", "merchant": "PureGym", "desc": "PUREGYM LIMITED", "amount": 24.99, "cat": "Health & Beauty", "year": 2024, "month": "Mar"},
+{"id": 453, "date": "2024-03-02", "merchant": "Sainsburys", "desc": "SAINSBURYS SUPERSTORE", "amount": 82.39, "cat": "Groceries", "year": 2024, "month": "Mar"},
+{"id": 454, "date": "2024-03-02", "merchant": "Nando's", "desc": "NANDOS RESTAURANT", "amount": 20.14, "cat": "Eating Out", "year": 2024, "month": "Mar"},
+{"id": 455, "date": "2024-03-02", "merchant": "Council Tax", "desc": "LBHF COUNCIL TAX", "amount": 141.11, "cat": "Bills", "year": 2024, "month": "Mar"},
+{"id": 456, "date": "2024-03-02", "merchant": "BT Broadband", "desc": "BT GROUP PLC", "amount": 45.1, "cat": "Bills", "year": 2024, "month": "Mar"},
+{"id": 457, "date": "2024-03-04", "merchant": "Pret A Manger", "desc": "PRET A MANGER LTD", "amount": 38.32, "cat": "Eating Out", "year": 2024, "month": "Mar"},
+{"id": 458, "date": "2024-03-04", "merchant": "EDF Energy", "desc": "EDF ENERGY CUSTOMERS", "amount": 64.93, "cat": "Bills", "year": 2024, "month": "Mar"},
+{"id": 459, "date": "2024-03-04", "merchant": "Nando's", "desc": "NANDOS RESTAURANT", "amount": 39.37, "cat": "Eating Out", "year": 2024, "month": "Mar"},
+{"id": 460, "date": "2024-03-04", "merchant": "ASOS", "desc": "ASOS.COM LTD", "amount": 96.62, "cat": "Shopping", "year": 2024, "month": "Mar"},
+{"id": 461, "date": "2024-03-05", "merchant": "Sky Sports", "desc": "SKY DIGITAL", "amount": 25.99, "cat": "Entertainment", "year": 2024, "month": "Mar"},
+{"id": 462, "date": "2024-03-06", "merchant": "Netflix", "desc": "NETFLIX.COM", "amount": 15.99, "cat": "Entertainment", "year": 2024, "month": "Mar"},
+{"id": 463, "date": "2024-03-06", "merchant": "Spotify", "desc": "SPOTIFY AB", "amount": 9.99, "cat": "Entertainment", "year": 2024, "month": "Mar"},
+{"id": 464, "date": "2024-03-07", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 7.5, "cat": "Transport", "year": 2024, "month": "Mar"},
+{"id": 465, "date": "2024-03-07", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 33.91, "cat": "Transport", "year": 2024, "month": "Mar"},
+{"id": 466, "date": "2024-03-08", "merchant": "BP Petrol", "desc": "BP OIL UK LTD", "amount": 54.43, "cat": "Transport", "year": 2024, "month": "Mar"},
+{"id": 467, "date": "2024-03-10", "merchant": "Lidl", "desc": "LIDL GB GMBH", "amount": 62.65, "cat": "Groceries", "year": 2024, "month": "Mar"},
+{"id": 468, "date": "2024-03-11", "merchant": "Shell Petrol", "desc": "SHELL PETROL STATION", "amount": 43.49, "cat": "Transport", "year": 2024, "month": "Mar"},
+{"id": 469, "date": "2024-03-12", "merchant": "Boots", "desc": "BOOTS UK LTD", "amount": 36.81, "cat": "Health & Beauty", "year": 2024, "month": "Mar"},
+{"id": 470, "date": "2024-03-13", "merchant": "Vanguard ISA", "desc": "VANGUARD ASSET MGMT", "amount": 238.1, "cat": "Investment", "year": 2024, "month": "Mar"},
+{"id": 471, "date": "2024-03-15", "merchant": "ASDA", "desc": "ASDA STORES 4766", "amount": 85.22, "cat": "Groceries", "year": 2024, "month": "Mar"},
+{"id": 472, "date": "2024-03-17", "merchant": "B&Q", "desc": "B&Q PLC", "amount": 38.18, "cat": "Home & Family", "year": 2024, "month": "Mar"},
+{"id": 473, "date": "2024-03-18", "merchant": "Nando's", "desc": "NANDOS RESTAURANT", "amount": 36.76, "cat": "Eating Out", "year": 2024, "month": "Mar"},
+{"id": 474, "date": "2024-03-18", "merchant": "ASOS", "desc": "ASOS.COM LTD", "amount": 44.08, "cat": "Shopping", "year": 2024, "month": "Mar"},
+{"id": 475, "date": "2024-03-22", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 14.82, "cat": "Transport", "year": 2024, "month": "Mar"},
+{"id": 476, "date": "2024-03-23", "merchant": "Sainsburys", "desc": "SAINSBURYS SUPERSTORE", "amount": 65.58, "cat": "Groceries", "year": 2024, "month": "Mar"},
+{"id": 478, "date": "2024-04-01", "merchant": "Lidl", "desc": "LIDL GB GMBH", "amount": 101.94, "cat": "Groceries", "year": 2024, "month": "Apr"},
+{"id": 479, "date": "2024-04-01", "merchant": "Rent Payment", "desc": "RENT PAYMENT SO", "amount": 997.9, "cat": "Home & Family", "year": 2024, "month": "Apr"},
+{"id": 480, "date": "2024-04-01", "merchant": "Council Tax", "desc": "LBHF COUNCIL TAX", "amount": 138.49, "cat": "Bills", "year": 2024, "month": "Apr"},
+{"id": 481, "date": "2024-04-01", "merchant": "PureGym", "desc": "PUREGYM LIMITED", "amount": 24.99, "cat": "Health & Beauty", "year": 2024, "month": "Apr"},
+{"id": 482, "date": "2024-04-03", "merchant": "Uber", "desc": "UBER *TRIP", "amount": 8.65, "cat": "Transport", "year": 2024, "month": "Apr"},
+{"id": 483, "date": "2024-04-03", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 26.03, "cat": "Transport", "year": 2024, "month": "Apr"},
+{"id": 484, "date": "2024-04-04", "merchant": "Thames Water", "desc": "THAMES WATER UTIL", "amount": 36.03, "cat": "Bills", "year": 2024, "month": "Apr"},
+{"id": 485, "date": "2024-04-04", "merchant": "Netflix", "desc": "NETFLIX.COM", "amount": 15.99, "cat": "Entertainment", "year": 2024, "month": "Apr"},
+{"id": 486, "date": "2024-04-04", "merchant": "Spotify", "desc": "SPOTIFY AB", "amount": 9.99, "cat": "Entertainment", "year": 2024, "month": "Apr"},
+{"id": 487, "date": "2024-04-05", "merchant": "BT Broadband", "desc": "BT GROUP PLC", "amount": 40.41, "cat": "Bills", "year": 2024, "month": "Apr"},
+{"id": 488, "date": "2024-04-05", "merchant": "British Gas", "desc": "BRITISH GAS SERVICES", "amount": 52.75, "cat": "Bills", "year": 2024, "month": "Apr"},
+{"id": 489, "date": "2024-04-05", "merchant": "BP Petrol", "desc": "BP OIL UK LTD", "amount": 39.03, "cat": "Transport", "year": 2024, "month": "Apr"},
+{"id": 490, "date": "2024-04-05", "merchant": "EDF Energy", "desc": "EDF ENERGY CUSTOMERS", "amount": 64.35, "cat": "Bills", "year": 2024, "month": "Apr"},
+{"id": 491, "date": "2024-04-05", "merchant": "Boots", "desc": "BOOTS UK LTD", "amount": 31.61, "cat": "Health & Beauty", "year": 2024, "month": "Apr"},
+{"id": 492, "date": "2024-04-06", "merchant": "Sky Sports", "desc": "SKY DIGITAL", "amount": 25.99, "cat": "Entertainment", "year": 2024, "month": "Apr"},
+{"id": 493, "date": "2024-04-10", "merchant": "Amazon", "desc": "AMAZON UK RETAIL", "amount": 88.85, "cat": "Shopping", "year": 2024, "month": "Apr"},
+{"id": 494, "date": "2024-04-10", "merchant": "ASDA", "desc": "ASDA STORES 4766", "amount": 41.87, "cat": "Groceries", "year": 2024, "month": "Apr"},
+{"id": 495, "date": "2024-04-10", "merchant": "Vanguard ISA", "desc": "VANGUARD ASSET MGMT", "amount": 223.54, "cat": "Investment", "year": 2024, "month": "Apr"},
+{"id": 496, "date": "2024-04-11", "merchant": "Costa Coffee", "desc": "COSTA COFFEE 091", "amount": 34.3, "cat": "Eating Out", "year": 2024, "month": "Apr"},
+{"id": 497, "date": "2024-04-11", "merchant": "Uber", "desc": "UBER *TRIP", "amount": 37.92, "cat": "Transport", "year": 2024, "month": "Apr"},
+{"id": 498, "date": "2024-04-12", "merchant": "British Red Cross", "desc": "BRITISH RED CROSS", "amount": 21.91, "cat": "Charity", "year": 2024, "month": "Apr"},
+{"id": 499, "date": "2024-04-14", "merchant": "Amazon", "desc": "AMAZON UK RETAIL", "amount": 57.26, "cat": "Shopping", "year": 2024, "month": "Apr"},
+{"id": 500, "date": "2024-04-15", "merchant": "Costa Coffee", "desc": "COSTA COFFEE 091", "amount": 36.31, "cat": "Eating Out", "year": 2024, "month": "Apr"},
+{"id": 501, "date": "2024-04-16", "merchant": "Sainsburys", "desc": "SAINSBURYS SUPERSTORE", "amount": 79.95, "cat": "Groceries", "year": 2024, "month": "Apr"},
+{"id": 502, "date": "2024-04-17", "merchant": "Subway", "desc": "SUBWAY 12340", "amount": 16.73, "cat": "Eating Out", "year": 2024, "month": "Apr"},
+{"id": 503, "date": "2024-04-19", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 52.79, "cat": "Transport", "year": 2024, "month": "Apr"},
+{"id": 504, "date": "2024-04-20", "merchant": "Subway", "desc": "SUBWAY 12340", "amount": 21.2, "cat": "Eating Out", "year": 2024, "month": "Apr"},
+{"id": 505, "date": "2024-04-24", "merchant": "Subway", "desc": "SUBWAY 12340", "amount": 35.56, "cat": "Eating Out", "year": 2024, "month": "Apr"},
+{"id": 506, "date": "2024-04-24", "merchant": "Waitrose", "desc": "WAITROSE & PARTNERS", "amount": 86.97, "cat": "Groceries", "year": 2024, "month": "Apr"},
+{"id": 507, "date": "2024-04-24", "merchant": "Uber", "desc": "UBER *TRIP", "amount": 8.85, "cat": "Transport", "year": 2024, "month": "Apr"},
+{"id": 508, "date": "2024-04-26", "merchant": "BP Petrol", "desc": "BP OIL UK LTD", "amount": 10.64, "cat": "Transport", "year": 2024, "month": "Apr"},
+{"id": 509, "date": "2024-04-28", "merchant": "McDonald's", "desc": "MCDONALDS 6482", "amount": 28.61, "cat": "Eating Out", "year": 2024, "month": "Apr"},
+{"id": 510, "date": "2024-04-28", "merchant": "Argos", "desc": "ARGOS LTD", "amount": 129.23, "cat": "Shopping", "year": 2024, "month": "Apr"},
+{"id": 512, "date": "2024-05-01", "merchant": "PureGym", "desc": "PUREGYM LIMITED", "amount": 24.99, "cat": "Health & Beauty", "year": 2024, "month": "May"},
+{"id": 513, "date": "2024-05-01", "merchant": "Sky Sports", "desc": "SKY DIGITAL", "amount": 25.99, "cat": "Entertainment", "year": 2024, "month": "May"},
+{"id": 514, "date": "2024-05-01", "merchant": "Rent Payment", "desc": "RENT PAYMENT SO", "amount": 980.9, "cat": "Home & Family", "year": 2024, "month": "May"},
+{"id": 515, "date": "2024-05-02", "merchant": "BP Petrol", "desc": "BP OIL UK LTD", "amount": 15.25, "cat": "Transport", "year": 2024, "month": "May"},
+{"id": 516, "date": "2024-05-02", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 4.39, "cat": "Transport", "year": 2024, "month": "May"},
+{"id": 517, "date": "2024-05-03", "merchant": "BT Broadband", "desc": "BT GROUP PLC", "amount": 38.23, "cat": "Bills", "year": 2024, "month": "May"},
+{"id": 518, "date": "2024-05-03", "merchant": "Council Tax", "desc": "LBHF COUNCIL TAX", "amount": 143.62, "cat": "Bills", "year": 2024, "month": "May"},
+{"id": 519, "date": "2024-05-03", "merchant": "Netflix", "desc": "NETFLIX.COM", "amount": 15.99, "cat": "Entertainment", "year": 2024, "month": "May"},
+{"id": 520, "date": "2024-05-03", "merchant": "Spotify", "desc": "SPOTIFY AB", "amount": 9.99, "cat": "Entertainment", "year": 2024, "month": "May"},
+{"id": 521, "date": "2024-05-03", "merchant": "Subway", "desc": "SUBWAY 12340", "amount": 36.15, "cat": "Eating Out", "year": 2024, "month": "May"},
+{"id": 522, "date": "2024-05-03", "merchant": "Waitrose", "desc": "WAITROSE & PARTNERS", "amount": 62.06, "cat": "Groceries", "year": 2024, "month": "May"},
+{"id": 523, "date": "2024-05-04", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 21.6, "cat": "Transport", "year": 2024, "month": "May"},
+{"id": 524, "date": "2024-05-05", "merchant": "Thames Water", "desc": "THAMES WATER UTIL", "amount": 36.91, "cat": "Bills", "year": 2024, "month": "May"},
+{"id": 525, "date": "2024-05-05", "merchant": "EDF Energy", "desc": "EDF ENERGY CUSTOMERS", "amount": 64.21, "cat": "Bills", "year": 2024, "month": "May"},
+{"id": 526, "date": "2024-05-05", "merchant": "British Gas", "desc": "BRITISH GAS SERVICES", "amount": 55.8, "cat": "Bills", "year": 2024, "month": "May"},
+{"id": 527, "date": "2024-05-06", "merchant": "Pret A Manger", "desc": "PRET A MANGER LTD", "amount": 31.9, "cat": "Eating Out", "year": 2024, "month": "May"},
+{"id": 528, "date": "2024-05-09", "merchant": "Uber", "desc": "UBER *TRIP", "amount": 14.99, "cat": "Transport", "year": 2024, "month": "May"},
+{"id": 529, "date": "2024-05-10", "merchant": "John Lewis", "desc": "JOHN LEWIS PLC", "amount": 54.0, "cat": "Shopping", "year": 2024, "month": "May"},
+{"id": 530, "date": "2024-05-10", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 38.59, "cat": "Transport", "year": 2024, "month": "May"},
+{"id": 531, "date": "2024-05-10", "merchant": "Sainsburys", "desc": "SAINSBURYS SUPERSTORE", "amount": 80.65, "cat": "Groceries", "year": 2024, "month": "May"},
+{"id": 532, "date": "2024-05-11", "merchant": "Vanguard ISA", "desc": "VANGUARD ASSET MGMT", "amount": 280.48, "cat": "Investment", "year": 2024, "month": "May"},
+{"id": 533, "date": "2024-05-12", "merchant": "Pret A Manger", "desc": "PRET A MANGER LTD", "amount": 17.28, "cat": "Eating Out", "year": 2024, "month": "May"},
+{"id": 534, "date": "2024-05-15", "merchant": "Tesco", "desc": "TESCO STORES 3321", "amount": 89.69, "cat": "Groceries", "year": 2024, "month": "May"},
+{"id": 535, "date": "2024-05-16", "merchant": "Amazon", "desc": "AMAZON UK RETAIL", "amount": 107.62, "cat": "Shopping", "year": 2024, "month": "May"},
+{"id": 536, "date": "2024-05-16", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 30.87, "cat": "Transport", "year": 2024, "month": "May"},
+{"id": 537, "date": "2024-05-16", "merchant": "Uber", "desc": "UBER *TRIP", "amount": 34.96, "cat": "Transport", "year": 2024, "month": "May"},
+{"id": 538, "date": "2024-05-18", "merchant": "Superdrug", "desc": "SUPERDRUG STORES", "amount": 33.44, "cat": "Health & Beauty", "year": 2024, "month": "May"},
+{"id": 539, "date": "2024-05-22", "merchant": "McDonald's", "desc": "MCDONALDS 6482", "amount": 9.69, "cat": "Eating Out", "year": 2024, "month": "May"},
+{"id": 540, "date": "2024-05-23", "merchant": "Sainsburys", "desc": "SAINSBURYS SUPERSTORE", "amount": 63.59, "cat": "Groceries", "year": 2024, "month": "May"},
+{"id": 541, "date": "2024-05-25", "merchant": "Nando's", "desc": "NANDOS RESTAURANT", "amount": 38.07, "cat": "Eating Out", "year": 2024, "month": "May"},
+{"id": 542, "date": "2024-05-25", "merchant": "ASOS", "desc": "ASOS.COM LTD", "amount": 29.57, "cat": "Shopping", "year": 2024, "month": "May"},
+{"id": 544, "date": "2024-06-01", "merchant": "ASDA", "desc": "ASDA STORES 4766", "amount": 64.94, "cat": "Groceries", "year": 2024, "month": "Jun"},
+{"id": 545, "date": "2024-06-01", "merchant": "PureGym", "desc": "PUREGYM LIMITED", "amount": 24.99, "cat": "Health & Beauty", "year": 2024, "month": "Jun"},
+{"id": 546, "date": "2024-06-01", "merchant": "British Gas", "desc": "BRITISH GAS SERVICES", "amount": 51.49, "cat": "Bills", "year": 2024, "month": "Jun"},
+{"id": 547, "date": "2024-06-01", "merchant": "Rent Payment", "desc": "RENT PAYMENT SO", "amount": 990.5, "cat": "Home & Family", "year": 2024, "month": "Jun"},
+{"id": 548, "date": "2024-06-02", "merchant": "Spotify", "desc": "SPOTIFY AB", "amount": 9.99, "cat": "Entertainment", "year": 2024, "month": "Jun"},
+{"id": 549, "date": "2024-06-03", "merchant": "Netflix", "desc": "NETFLIX.COM", "amount": 15.99, "cat": "Entertainment", "year": 2024, "month": "Jun"},
+{"id": 550, "date": "2024-06-03", "merchant": "Pret A Manger", "desc": "PRET A MANGER LTD", "amount": 23.85, "cat": "Eating Out", "year": 2024, "month": "Jun"},
+{"id": 551, "date": "2024-06-03", "merchant": "EDF Energy", "desc": "EDF ENERGY CUSTOMERS", "amount": 68.61, "cat": "Bills", "year": 2024, "month": "Jun"},
+{"id": 552, "date": "2024-06-03", "merchant": "Oxfam", "desc": "OXFAM DONATION", "amount": 17.89, "cat": "Charity", "year": 2024, "month": "Jun"},
+{"id": 553, "date": "2024-06-04", "merchant": "Thames Water", "desc": "THAMES WATER UTIL", "amount": 39.37, "cat": "Bills", "year": 2024, "month": "Jun"},
+{"id": 554, "date": "2024-06-04", "merchant": "Council Tax", "desc": "LBHF COUNCIL TAX", "amount": 140.32, "cat": "Bills", "year": 2024, "month": "Jun"},
+{"id": 555, "date": "2024-06-05", "merchant": "BT Broadband", "desc": "BT GROUP PLC", "amount": 41.24, "cat": "Bills", "year": 2024, "month": "Jun"},
+{"id": 556, "date": "2024-06-06", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 52.52, "cat": "Transport", "year": 2024, "month": "Jun"},
+{"id": 557, "date": "2024-06-07", "merchant": "Sky Sports", "desc": "SKY DIGITAL", "amount": 25.99, "cat": "Entertainment", "year": 2024, "month": "Jun"},
+{"id": 558, "date": "2024-06-07", "merchant": "Nando's", "desc": "NANDOS RESTAURANT", "amount": 12.73, "cat": "Eating Out", "year": 2024, "month": "Jun"},
+{"id": 559, "date": "2024-06-08", "merchant": "Pret A Manger", "desc": "PRET A MANGER LTD", "amount": 10.39, "cat": "Eating Out", "year": 2024, "month": "Jun"},
+{"id": 560, "date": "2024-06-08", "merchant": "Tesco", "desc": "TESCO STORES 3321", "amount": 64.85, "cat": "Groceries", "year": 2024, "month": "Jun"},
+{"id": 561, "date": "2024-06-11", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 48.08, "cat": "Transport", "year": 2024, "month": "Jun"},
+{"id": 562, "date": "2024-06-12", "merchant": "Nando's", "desc": "NANDOS RESTAURANT", "amount": 31.0, "cat": "Eating Out", "year": 2024, "month": "Jun"},
+{"id": 563, "date": "2024-06-14", "merchant": "Vanguard ISA", "desc": "VANGUARD ASSET MGMT", "amount": 219.01, "cat": "Investment", "year": 2024, "month": "Jun"},
+{"id": 564, "date": "2024-06-15", "merchant": "Superdrug", "desc": "SUPERDRUG STORES", "amount": 23.62, "cat": "Health & Beauty", "year": 2024, "month": "Jun"},
+{"id": 565, "date": "2024-06-15", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 38.74, "cat": "Transport", "year": 2024, "month": "Jun"},
+{"id": 566, "date": "2024-06-15", "merchant": "ASOS", "desc": "ASOS.COM LTD", "amount": 20.74, "cat": "Shopping", "year": 2024, "month": "Jun"},
+{"id": 567, "date": "2024-06-15", "merchant": "Uber", "desc": "UBER *TRIP", "amount": 42.48, "cat": "Transport", "year": 2024, "month": "Jun"},
+{"id": 568, "date": "2024-06-17", "merchant": "Lidl", "desc": "LIDL GB GMBH", "amount": 36.29, "cat": "Groceries", "year": 2024, "month": "Jun"},
+{"id": 569, "date": "2024-06-17", "merchant": "McDonald's", "desc": "MCDONALDS 6482", "amount": 23.83, "cat": "Eating Out", "year": 2024, "month": "Jun"},
+{"id": 570, "date": "2024-06-19", "merchant": "John Lewis", "desc": "JOHN LEWIS PLC", "amount": 19.19, "cat": "Shopping", "year": 2024, "month": "Jun"},
+{"id": 571, "date": "2024-06-20", "merchant": "Booking.com", "desc": "BOOKING.COM", "amount": 351.1, "cat": "Travel", "year": 2024, "month": "Jun"},
+{"id": 572, "date": "2024-06-21", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 36.4, "cat": "Transport", "year": 2024, "month": "Jun"},
+{"id": 573, "date": "2024-06-21", "merchant": "Argos", "desc": "ARGOS LTD", "amount": 50.76, "cat": "Shopping", "year": 2024, "month": "Jun"},
+{"id": 574, "date": "2024-06-24", "merchant": "ASDA", "desc": "ASDA STORES 4766", "amount": 57.16, "cat": "Groceries", "year": 2024, "month": "Jun"},
+{"id": 576, "date": "2024-07-01", "merchant": "Rent Payment", "desc": "RENT PAYMENT SO", "amount": 958.43, "cat": "Home & Family", "year": 2024, "month": "Jul"},
+{"id": 577, "date": "2024-07-01", "merchant": "Sky Sports", "desc": "SKY DIGITAL", "amount": 25.99, "cat": "Entertainment", "year": 2024, "month": "Jul"},
+{"id": 578, "date": "2024-07-01", "merchant": "BT Broadband", "desc": "BT GROUP PLC", "amount": 41.6, "cat": "Bills", "year": 2024, "month": "Jul"},
+{"id": 579, "date": "2024-07-01", "merchant": "PureGym", "desc": "PUREGYM LIMITED", "amount": 24.99, "cat": "Health & Beauty", "year": 2024, "month": "Jul"},
+{"id": 580, "date": "2024-07-02", "merchant": "Spotify", "desc": "SPOTIFY AB", "amount": 9.99, "cat": "Entertainment", "year": 2024, "month": "Jul"},
+{"id": 581, "date": "2024-07-03", "merchant": "Thames Water", "desc": "THAMES WATER UTIL", "amount": 36.84, "cat": "Bills", "year": 2024, "month": "Jul"},
+{"id": 582, "date": "2024-07-03", "merchant": "Council Tax", "desc": "LBHF COUNCIL TAX", "amount": 145.86, "cat": "Bills", "year": 2024, "month": "Jul"},
+{"id": 583, "date": "2024-07-03", "merchant": "Lidl", "desc": "LIDL GB GMBH", "amount": 71.82, "cat": "Groceries", "year": 2024, "month": "Jul"},
+{"id": 584, "date": "2024-07-03", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 36.95, "cat": "Transport", "year": 2024, "month": "Jul"},
+{"id": 585, "date": "2024-07-05", "merchant": "British Gas", "desc": "BRITISH GAS SERVICES", "amount": 53.21, "cat": "Bills", "year": 2024, "month": "Jul"},
+{"id": 586, "date": "2024-07-05", "merchant": "Airbnb", "desc": "AIRBNB PAYMENTS", "amount": 352.65, "cat": "Travel", "year": 2024, "month": "Jul"},
+{"id": 587, "date": "2024-07-05", "merchant": "Shell Petrol", "desc": "SHELL PETROL STATION", "amount": 7.94, "cat": "Transport", "year": 2024, "month": "Jul"},
+{"id": 588, "date": "2024-07-05", "merchant": "Uber", "desc": "UBER *TRIP", "amount": 34.35, "cat": "Transport", "year": 2024, "month": "Jul"},
+{"id": 589, "date": "2024-07-05", "merchant": "EDF Energy", "desc": "EDF ENERGY CUSTOMERS", "amount": 65.21, "cat": "Bills", "year": 2024, "month": "Jul"},
+{"id": 590, "date": "2024-07-06", "merchant": "Netflix", "desc": "NETFLIX.COM", "amount": 15.99, "cat": "Entertainment", "year": 2024, "month": "Jul"},
+{"id": 591, "date": "2024-07-07", "merchant": "Uber", "desc": "UBER *TRIP", "amount": 15.55, "cat": "Transport", "year": 2024, "month": "Jul"},
+{"id": 592, "date": "2024-07-09", "merchant": "Sainsburys", "desc": "SAINSBURYS SUPERSTORE", "amount": 59.83, "cat": "Groceries", "year": 2024, "month": "Jul"},
+{"id": 593, "date": "2024-07-10", "merchant": "Costa Coffee", "desc": "COSTA COFFEE 091", "amount": 15.32, "cat": "Eating Out", "year": 2024, "month": "Jul"},
+{"id": 594, "date": "2024-07-10", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 32.51, "cat": "Transport", "year": 2024, "month": "Jul"},
+{"id": 595, "date": "2024-07-10", "merchant": "Nando's", "desc": "NANDOS RESTAURANT", "amount": 38.93, "cat": "Eating Out", "year": 2024, "month": "Jul"},
+{"id": 596, "date": "2024-07-10", "merchant": "BP Petrol", "desc": "BP OIL UK LTD", "amount": 13.19, "cat": "Transport", "year": 2024, "month": "Jul"},
+{"id": 597, "date": "2024-07-11", "merchant": "Shell Petrol", "desc": "SHELL PETROL STATION", "amount": 52.33, "cat": "Transport", "year": 2024, "month": "Jul"},
+{"id": 598, "date": "2024-07-11", "merchant": "Vanguard ISA", "desc": "VANGUARD ASSET MGMT", "amount": 256.14, "cat": "Investment", "year": 2024, "month": "Jul"},
+{"id": 599, "date": "2024-07-11", "merchant": "McDonald's", "desc": "MCDONALDS 6482", "amount": 10.12, "cat": "Eating Out", "year": 2024, "month": "Jul"},
+{"id": 600, "date": "2024-07-16", "merchant": "ASDA", "desc": "ASDA STORES 4766", "amount": 62.7, "cat": "Groceries", "year": 2024, "month": "Jul"},
+{"id": 601, "date": "2024-07-17", "merchant": "Uber", "desc": "UBER *TRIP", "amount": 22.45, "cat": "Transport", "year": 2024, "month": "Jul"},
+{"id": 602, "date": "2024-07-19", "merchant": "McDonald's", "desc": "MCDONALDS 6482", "amount": 28.9, "cat": "Eating Out", "year": 2024, "month": "Jul"},
+{"id": 603, "date": "2024-07-24", "merchant": "ASDA", "desc": "ASDA STORES 4766", "amount": 77.83, "cat": "Groceries", "year": 2024, "month": "Jul"},
+{"id": 604, "date": "2024-07-25", "merchant": "Zara", "desc": "ZARA UK LTD", "amount": 81.09, "cat": "Shopping", "year": 2024, "month": "Jul"},
+{"id": 606, "date": "2024-07-27", "merchant": "BP Petrol", "desc": "BP OIL UK LTD", "amount": 10.52, "cat": "Transport", "year": 2024, "month": "Jul"},
+{"id": 607, "date": "2024-07-28", "merchant": "Subway", "desc": "SUBWAY 12340", "amount": 11.96, "cat": "Eating Out", "year": 2024, "month": "Jul"},
+{"id": 608, "date": "2024-08-01", "merchant": "Lidl", "desc": "LIDL GB GMBH", "amount": 59.43, "cat": "Groceries", "year": 2024, "month": "Aug"},
+{"id": 609, "date": "2024-08-01", "merchant": "Airbnb", "desc": "AIRBNB PAYMENTS", "amount": 503.87, "cat": "Travel", "year": 2024, "month": "Aug"},
+{"id": 610, "date": "2024-08-01", "merchant": "BP Petrol", "desc": "BP OIL UK LTD", "amount": 25.16, "cat": "Transport", "year": 2024, "month": "Aug"},
+{"id": 611, "date": "2024-08-01", "merchant": "PureGym", "desc": "PUREGYM LIMITED", "amount": 24.99, "cat": "Health & Beauty", "year": 2024, "month": "Aug"},
+{"id": 612, "date": "2024-08-01", "merchant": "Rent Payment", "desc": "RENT PAYMENT SO", "amount": 1024.85, "cat": "Home & Family", "year": 2024, "month": "Aug"},
+{"id": 613, "date": "2024-08-01", "merchant": "EDF Energy", "desc": "EDF ENERGY CUSTOMERS", "amount": 67.29, "cat": "Bills", "year": 2024, "month": "Aug"},
+{"id": 614, "date": "2024-08-02", "merchant": "BT Broadband", "desc": "BT GROUP PLC", "amount": 45.76, "cat": "Bills", "year": 2024, "month": "Aug"},
+{"id": 615, "date": "2024-08-02", "merchant": "Spotify", "desc": "SPOTIFY AB", "amount": 9.99, "cat": "Entertainment", "year": 2024, "month": "Aug"},
+{"id": 616, "date": "2024-08-02", "merchant": "Thames Water", "desc": "THAMES WATER UTIL", "amount": 37.77, "cat": "Bills", "year": 2024, "month": "Aug"},
+{"id": 617, "date": "2024-08-02", "merchant": "Nando's", "desc": "NANDOS RESTAURANT", "amount": 28.16, "cat": "Eating Out", "year": 2024, "month": "Aug"},
+{"id": 618, "date": "2024-08-03", "merchant": "Uber", "desc": "UBER *TRIP", "amount": 23.12, "cat": "Transport", "year": 2024, "month": "Aug"},
+{"id": 619, "date": "2024-08-04", "merchant": "Netflix", "desc": "NETFLIX.COM", "amount": 15.99, "cat": "Entertainment", "year": 2024, "month": "Aug"},
+{"id": 620, "date": "2024-08-05", "merchant": "British Gas", "desc": "BRITISH GAS SERVICES", "amount": 54.47, "cat": "Bills", "year": 2024, "month": "Aug"},
+{"id": 621, "date": "2024-08-05", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 46.38, "cat": "Transport", "year": 2024, "month": "Aug"},
+{"id": 622, "date": "2024-08-05", "merchant": "Council Tax", "desc": "LBHF COUNCIL TAX", "amount": 140.28, "cat": "Bills", "year": 2024, "month": "Aug"},
+{"id": 623, "date": "2024-08-05", "merchant": "Sky Sports", "desc": "SKY DIGITAL", "amount": 25.99, "cat": "Entertainment", "year": 2024, "month": "Aug"},
+{"id": 624, "date": "2024-08-08", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 45.65, "cat": "Transport", "year": 2024, "month": "Aug"},
+{"id": 625, "date": "2024-08-09", "merchant": "Waitrose", "desc": "WAITROSE & PARTNERS", "amount": 66.93, "cat": "Groceries", "year": 2024, "month": "Aug"},
+{"id": 626, "date": "2024-08-11", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 51.47, "cat": "Transport", "year": 2024, "month": "Aug"},
+{"id": 627, "date": "2024-08-11", "merchant": "Vanguard ISA", "desc": "VANGUARD ASSET MGMT", "amount": 196.42, "cat": "Investment", "year": 2024, "month": "Aug"},
+{"id": 628, "date": "2024-08-16", "merchant": "ASDA", "desc": "ASDA STORES 4766", "amount": 70.23, "cat": "Groceries", "year": 2024, "month": "Aug"},
+{"id": 629, "date": "2024-08-17", "merchant": "Uber", "desc": "UBER *TRIP", "amount": 23.07, "cat": "Transport", "year": 2024, "month": "Aug"},
+{"id": 630, "date": "2024-08-18", "merchant": "Nando's", "desc": "NANDOS RESTAURANT", "amount": 37.83, "cat": "Eating Out", "year": 2024, "month": "Aug"},
+{"id": 631, "date": "2024-08-22", "merchant": "Lidl", "desc": "LIDL GB GMBH", "amount": 95.35, "cat": "Groceries", "year": 2024, "month": "Aug"},
+{"id": 632, "date": "2024-08-25", "merchant": "McDonald's", "desc": "MCDONALDS 6482", "amount": 12.29, "cat": "Eating Out", "year": 2024, "month": "Aug"},
+{"id": 633, "date": "2024-08-26", "merchant": "BP Petrol", "desc": "BP OIL UK LTD", "amount": 11.45, "cat": "Transport", "year": 2024, "month": "Aug"},
+{"id": 635, "date": "2024-08-27", "merchant": "John Lewis", "desc": "JOHN LEWIS PLC", "amount": 72.47, "cat": "Shopping", "year": 2024, "month": "Aug"},
+{"id": 636, "date": "2024-08-28", "merchant": "Subway", "desc": "SUBWAY 12340", "amount": 11.11, "cat": "Eating Out", "year": 2024, "month": "Aug"},
+{"id": 637, "date": "2024-09-01", "merchant": "PureGym", "desc": "PUREGYM LIMITED", "amount": 24.99, "cat": "Health & Beauty", "year": 2024, "month": "Sep"},
+{"id": 638, "date": "2024-09-01", "merchant": "Council Tax", "desc": "LBHF COUNCIL TAX", "amount": 139.91, "cat": "Bills", "year": 2024, "month": "Sep"},
+{"id": 639, "date": "2024-09-01", "merchant": "Sky Sports", "desc": "SKY DIGITAL", "amount": 25.99, "cat": "Entertainment", "year": 2024, "month": "Sep"},
+{"id": 640, "date": "2024-09-01", "merchant": "Rent Payment", "desc": "RENT PAYMENT SO", "amount": 1013.9, "cat": "Home & Family", "year": 2024, "month": "Sep"},
+{"id": 641, "date": "2024-09-01", "merchant": "EDF Energy", "desc": "EDF ENERGY CUSTOMERS", "amount": 70.21, "cat": "Bills", "year": 2024, "month": "Sep"},
+{"id": 642, "date": "2024-09-02", "merchant": "Boots", "desc": "BOOTS UK LTD", "amount": 18.31, "cat": "Health & Beauty", "year": 2024, "month": "Sep"},
+{"id": 643, "date": "2024-09-02", "merchant": "Costa Coffee", "desc": "COSTA COFFEE 091", "amount": 27.98, "cat": "Eating Out", "year": 2024, "month": "Sep"},
+{"id": 644, "date": "2024-09-02", "merchant": "Argos", "desc": "ARGOS LTD", "amount": 49.56, "cat": "Shopping", "year": 2024, "month": "Sep"},
+{"id": 645, "date": "2024-09-02", "merchant": "BT Broadband", "desc": "BT GROUP PLC", "amount": 40.41, "cat": "Bills", "year": 2024, "month": "Sep"},
+{"id": 646, "date": "2024-09-03", "merchant": "ASOS", "desc": "ASOS.COM LTD", "amount": 103.65, "cat": "Shopping", "year": 2024, "month": "Sep"},
+{"id": 647, "date": "2024-09-03", "merchant": "Lidl", "desc": "LIDL GB GMBH", "amount": 72.88, "cat": "Groceries", "year": 2024, "month": "Sep"},
+{"id": 648, "date": "2024-09-04", "merchant": "Spotify", "desc": "SPOTIFY AB", "amount": 9.99, "cat": "Entertainment", "year": 2024, "month": "Sep"},
+{"id": 649, "date": "2024-09-05", "merchant": "BP Petrol", "desc": "BP OIL UK LTD", "amount": 6.26, "cat": "Transport", "year": 2024, "month": "Sep"},
+{"id": 650, "date": "2024-09-05", "merchant": "Thames Water", "desc": "THAMES WATER UTIL", "amount": 36.22, "cat": "Bills", "year": 2024, "month": "Sep"},
+{"id": 651, "date": "2024-09-05", "merchant": "British Gas", "desc": "BRITISH GAS SERVICES", "amount": 55.52, "cat": "Bills", "year": 2024, "month": "Sep"},
+{"id": 652, "date": "2024-09-05", "merchant": "Netflix", "desc": "NETFLIX.COM", "amount": 15.99, "cat": "Entertainment", "year": 2024, "month": "Sep"},
+{"id": 653, "date": "2024-09-09", "merchant": "Nando's", "desc": "NANDOS RESTAURANT", "amount": 31.66, "cat": "Eating Out", "year": 2024, "month": "Sep"},
+{"id": 654, "date": "2024-09-10", "merchant": "IKEA", "desc": "IKEA LTD", "amount": 77.12, "cat": "Home & Family", "year": 2024, "month": "Sep"},
+{"id": 655, "date": "2024-09-10", "merchant": "Vanguard ISA", "desc": "VANGUARD ASSET MGMT", "amount": 275.5, "cat": "Investment", "year": 2024, "month": "Sep"},
+{"id": 656, "date": "2024-09-10", "merchant": "Waitrose", "desc": "WAITROSE & PARTNERS", "amount": 49.36, "cat": "Groceries", "year": 2024, "month": "Sep"},
+{"id": 657, "date": "2024-09-11", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 45.49, "cat": "Transport", "year": 2024, "month": "Sep"},
+{"id": 658, "date": "2024-09-12", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 16.3, "cat": "Transport", "year": 2024, "month": "Sep"},
+{"id": 659, "date": "2024-09-12", "merchant": "Subway", "desc": "SUBWAY 12340", "amount": 9.23, "cat": "Eating Out", "year": 2024, "month": "Sep"},
+{"id": 660, "date": "2024-09-16", "merchant": "Sainsburys", "desc": "SAINSBURYS SUPERSTORE", "amount": 64.34, "cat": "Groceries", "year": 2024, "month": "Sep"},
+{"id": 661, "date": "2024-09-18", "merchant": "Subway", "desc": "SUBWAY 12340", "amount": 7.67, "cat": "Eating Out", "year": 2024, "month": "Sep"},
+{"id": 662, "date": "2024-09-18", "merchant": "Subway", "desc": "SUBWAY 12340", "amount": 23.74, "cat": "Eating Out", "year": 2024, "month": "Sep"},
+{"id": 663, "date": "2024-09-22", "merchant": "Pret A Manger", "desc": "PRET A MANGER LTD", "amount": 29.05, "cat": "Eating Out", "year": 2024, "month": "Sep"},
+{"id": 664, "date": "2024-09-23", "merchant": "Uber", "desc": "UBER *TRIP", "amount": 28.41, "cat": "Transport", "year": 2024, "month": "Sep"},
+{"id": 665, "date": "2024-09-23", "merchant": "Waitrose", "desc": "WAITROSE & PARTNERS", "amount": 49.25, "cat": "Groceries", "year": 2024, "month": "Sep"},
+{"id": 666, "date": "2024-09-25", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 33.68, "cat": "Transport", "year": 2024, "month": "Sep"},
+{"id": 668, "date": "2024-09-27", "merchant": "Shell Petrol", "desc": "SHELL PETROL STATION", "amount": 43.74, "cat": "Transport", "year": 2024, "month": "Sep"},
+{"id": 669, "date": "2024-09-27", "merchant": "Oxfam", "desc": "OXFAM DONATION", "amount": 15.86, "cat": "Charity", "year": 2024, "month": "Sep"},
+{"id": 670, "date": "2024-10-01", "merchant": "Shell Petrol", "desc": "SHELL PETROL STATION", "amount": 11.28, "cat": "Transport", "year": 2024, "month": "Oct"},
+{"id": 671, "date": "2024-10-01", "merchant": "PureGym", "desc": "PUREGYM LIMITED", "amount": 24.99, "cat": "Health & Beauty", "year": 2024, "month": "Oct"},
+{"id": 672, "date": "2024-10-01", "merchant": "Spotify", "desc": "SPOTIFY AB", "amount": 9.99, "cat": "Entertainment", "year": 2024, "month": "Oct"},
+{"id": 673, "date": "2024-10-01", "merchant": "Rent Payment", "desc": "RENT PAYMENT SO", "amount": 958.26, "cat": "Home & Family", "year": 2024, "month": "Oct"},
+{"id": 674, "date": "2024-10-02", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 34.86, "cat": "Transport", "year": 2024, "month": "Oct"},
+{"id": 675, "date": "2024-10-02", "merchant": "Costa Coffee", "desc": "COSTA COFFEE 091", "amount": 30.98, "cat": "Eating Out", "year": 2024, "month": "Oct"},
+{"id": 676, "date": "2024-10-02", "merchant": "EDF Energy", "desc": "EDF ENERGY CUSTOMERS", "amount": 67.97, "cat": "Bills", "year": 2024, "month": "Oct"},
+{"id": 677, "date": "2024-10-03", "merchant": "McDonald's", "desc": "MCDONALDS 6482", "amount": 29.15, "cat": "Eating Out", "year": 2024, "month": "Oct"},
+{"id": 678, "date": "2024-10-03", "merchant": "Sainsburys", "desc": "SAINSBURYS SUPERSTORE", "amount": 53.5, "cat": "Groceries", "year": 2024, "month": "Oct"},
+{"id": 679, "date": "2024-10-04", "merchant": "Thames Water", "desc": "THAMES WATER UTIL", "amount": 34.71, "cat": "Bills", "year": 2024, "month": "Oct"},
+{"id": 680, "date": "2024-10-04", "merchant": "Sky Sports", "desc": "SKY DIGITAL", "amount": 25.99, "cat": "Entertainment", "year": 2024, "month": "Oct"},
+{"id": 681, "date": "2024-10-04", "merchant": "BT Broadband", "desc": "BT GROUP PLC", "amount": 40.94, "cat": "Bills", "year": 2024, "month": "Oct"},
+{"id": 682, "date": "2024-10-04", "merchant": "British Gas", "desc": "BRITISH GAS SERVICES", "amount": 53.95, "cat": "Bills", "year": 2024, "month": "Oct"},
+{"id": 683, "date": "2024-10-04", "merchant": "Netflix", "desc": "NETFLIX.COM", "amount": 15.99, "cat": "Entertainment", "year": 2024, "month": "Oct"},
+{"id": 684, "date": "2024-10-05", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 7.43, "cat": "Transport", "year": 2024, "month": "Oct"},
+{"id": 685, "date": "2024-10-05", "merchant": "Council Tax", "desc": "LBHF COUNCIL TAX", "amount": 140.13, "cat": "Bills", "year": 2024, "month": "Oct"},
+{"id": 686, "date": "2024-10-08", "merchant": "BP Petrol", "desc": "BP OIL UK LTD", "amount": 52.99, "cat": "Transport", "year": 2024, "month": "Oct"},
+{"id": 687, "date": "2024-10-08", "merchant": "Tesco", "desc": "TESCO STORES 3321", "amount": 56.23, "cat": "Groceries", "year": 2024, "month": "Oct"},
+{"id": 688, "date": "2024-10-12", "merchant": "Uber", "desc": "UBER *TRIP", "amount": 22.97, "cat": "Transport", "year": 2024, "month": "Oct"},
+{"id": 689, "date": "2024-10-12", "merchant": "Costa Coffee", "desc": "COSTA COFFEE 091", "amount": 23.93, "cat": "Eating Out", "year": 2024, "month": "Oct"},
+{"id": 690, "date": "2024-10-12", "merchant": "BP Petrol", "desc": "BP OIL UK LTD", "amount": 23.53, "cat": "Transport", "year": 2024, "month": "Oct"},
+{"id": 692, "date": "2024-10-13", "merchant": "BP Petrol", "desc": "BP OIL UK LTD", "amount": 20.03, "cat": "Transport", "year": 2024, "month": "Oct"},
+{"id": 693, "date": "2024-10-14", "merchant": "Vanguard ISA", "desc": "VANGUARD ASSET MGMT", "amount": 299.26, "cat": "Investment", "year": 2024, "month": "Oct"},
+{"id": 694, "date": "2024-10-16", "merchant": "ASOS", "desc": "ASOS.COM LTD", "amount": 78.27, "cat": "Shopping", "year": 2024, "month": "Oct"},
+{"id": 695, "date": "2024-10-16", "merchant": "ASDA", "desc": "ASDA STORES 4766", "amount": 65.67, "cat": "Groceries", "year": 2024, "month": "Oct"},
+{"id": 696, "date": "2024-10-19", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 11.02, "cat": "Transport", "year": 2024, "month": "Oct"},
+{"id": 697, "date": "2024-10-20", "merchant": "Nando's", "desc": "NANDOS RESTAURANT", "amount": 39.94, "cat": "Eating Out", "year": 2024, "month": "Oct"},
+{"id": 698, "date": "2024-10-21", "merchant": "Nando's", "desc": "NANDOS RESTAURANT", "amount": 39.34, "cat": "Eating Out", "year": 2024, "month": "Oct"},
+{"id": 699, "date": "2024-10-22", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 43.85, "cat": "Transport", "year": 2024, "month": "Oct"},
+{"id": 700, "date": "2024-10-22", "merchant": "Lidl", "desc": "LIDL GB GMBH", "amount": 85.18, "cat": "Groceries", "year": 2024, "month": "Oct"},
+{"id": 701, "date": "2024-10-23", "merchant": "Oxfam", "desc": "OXFAM DONATION", "amount": 13.93, "cat": "Charity", "year": 2024, "month": "Oct"},
+{"id": 703, "date": "2024-11-01", "merchant": "PureGym", "desc": "PUREGYM LIMITED", "amount": 24.99, "cat": "Health & Beauty", "year": 2024, "month": "Nov"},
+{"id": 704, "date": "2024-11-01", "merchant": "Rent Payment", "desc": "RENT PAYMENT SO", "amount": 1035.14, "cat": "Home & Family", "year": 2024, "month": "Nov"},
+{"id": 705, "date": "2024-11-01", "merchant": "Waitrose", "desc": "WAITROSE & PARTNERS", "amount": 39.71, "cat": "Groceries", "year": 2024, "month": "Nov"},
+{"id": 706, "date": "2024-11-01", "merchant": "BT Broadband", "desc": "BT GROUP PLC", "amount": 42.4, "cat": "Bills", "year": 2024, "month": "Nov"},
+{"id": 707, "date": "2024-11-03", "merchant": "EDF Energy", "desc": "EDF ENERGY CUSTOMERS", "amount": 69.34, "cat": "Bills", "year": 2024, "month": "Nov"},
+{"id": 708, "date": "2024-11-03", "merchant": "Council Tax", "desc": "LBHF COUNCIL TAX", "amount": 145.13, "cat": "Bills", "year": 2024, "month": "Nov"},
+{"id": 709, "date": "2024-11-03", "merchant": "Subway", "desc": "SUBWAY 12340", "amount": 11.14, "cat": "Eating Out", "year": 2024, "month": "Nov"},
+{"id": 710, "date": "2024-11-03", "merchant": "Subway", "desc": "SUBWAY 12340", "amount": 9.17, "cat": "Eating Out", "year": 2024, "month": "Nov"},
+{"id": 712, "date": "2024-11-04", "merchant": "British Gas", "desc": "BRITISH GAS SERVICES", "amount": 49.38, "cat": "Bills", "year": 2024, "month": "Nov"},
+{"id": 713, "date": "2024-11-04", "merchant": "Thames Water", "desc": "THAMES WATER UTIL", "amount": 39.98, "cat": "Bills", "year": 2024, "month": "Nov"},
+{"id": 714, "date": "2024-11-06", "merchant": "Netflix", "desc": "NETFLIX.COM", "amount": 15.99, "cat": "Entertainment", "year": 2024, "month": "Nov"},
+{"id": 715, "date": "2024-11-06", "merchant": "Spotify", "desc": "SPOTIFY AB", "amount": 9.99, "cat": "Entertainment", "year": 2024, "month": "Nov"},
+{"id": 716, "date": "2024-11-06", "merchant": "Sky Sports", "desc": "SKY DIGITAL", "amount": 25.99, "cat": "Entertainment", "year": 2024, "month": "Nov"},
+{"id": 717, "date": "2024-11-07", "merchant": "John Lewis", "desc": "JOHN LEWIS PLC", "amount": 93.29, "cat": "Shopping", "year": 2024, "month": "Nov"},
+{"id": 718, "date": "2024-11-08", "merchant": "Sainsburys", "desc": "SAINSBURYS SUPERSTORE", "amount": 48.94, "cat": "Groceries", "year": 2024, "month": "Nov"},
+{"id": 719, "date": "2024-11-10", "merchant": "Shell Petrol", "desc": "SHELL PETROL STATION", "amount": 12.4, "cat": "Transport", "year": 2024, "month": "Nov"},
+{"id": 720, "date": "2024-11-10", "merchant": "Zara", "desc": "ZARA UK LTD", "amount": 120.28, "cat": "Shopping", "year": 2024, "month": "Nov"},
+{"id": 721, "date": "2024-11-11", "merchant": "Vanguard ISA", "desc": "VANGUARD ASSET MGMT", "amount": 269.05, "cat": "Investment", "year": 2024, "month": "Nov"},
+{"id": 722, "date": "2024-11-12", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 10.55, "cat": "Transport", "year": 2024, "month": "Nov"},
+{"id": 723, "date": "2024-11-12", "merchant": "ASOS", "desc": "ASOS.COM LTD", "amount": 133.28, "cat": "Shopping", "year": 2024, "month": "Nov"},
+{"id": 724, "date": "2024-11-14", "merchant": "Subway", "desc": "SUBWAY 12340", "amount": 32.38, "cat": "Eating Out", "year": 2024, "month": "Nov"},
+{"id": 725, "date": "2024-11-14", "merchant": "Shell Petrol", "desc": "SHELL PETROL STATION", "amount": 29.65, "cat": "Transport", "year": 2024, "month": "Nov"},
+{"id": 726, "date": "2024-11-15", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 27.76, "cat": "Transport", "year": 2024, "month": "Nov"},
+{"id": 727, "date": "2024-11-15", "merchant": "Lidl", "desc": "LIDL GB GMBH", "amount": 58.87, "cat": "Groceries", "year": 2024, "month": "Nov"},
+{"id": 728, "date": "2024-11-20", "merchant": "Oxfam", "desc": "OXFAM DONATION", "amount": 15.67, "cat": "Charity", "year": 2024, "month": "Nov"},
+{"id": 729, "date": "2024-11-21", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 33.98, "cat": "Transport", "year": 2024, "month": "Nov"},
+{"id": 730, "date": "2024-11-23", "merchant": "Waitrose", "desc": "WAITROSE & PARTNERS", "amount": 67.39, "cat": "Groceries", "year": 2024, "month": "Nov"},
+{"id": 731, "date": "2024-11-23", "merchant": "Costa Coffee", "desc": "COSTA COFFEE 091", "amount": 30.72, "cat": "Eating Out", "year": 2024, "month": "Nov"},
+{"id": 732, "date": "2024-11-27", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 10.33, "cat": "Transport", "year": 2024, "month": "Nov"},
+{"id": 734, "date": "2024-12-01", "merchant": "EDF Energy", "desc": "EDF ENERGY CUSTOMERS", "amount": 64.65, "cat": "Bills", "year": 2024, "month": "Dec"},
+{"id": 735, "date": "2024-12-01", "merchant": "PureGym", "desc": "PUREGYM LIMITED", "amount": 24.99, "cat": "Health & Beauty", "year": 2024, "month": "Dec"},
+{"id": 736, "date": "2024-12-01", "merchant": "Spotify", "desc": "SPOTIFY AB", "amount": 9.99, "cat": "Entertainment", "year": 2024, "month": "Dec"},
+{"id": 737, "date": "2024-12-01", "merchant": "Rent Payment", "desc": "RENT PAYMENT SO", "amount": 991.66, "cat": "Home & Family", "year": 2024, "month": "Dec"},
+{"id": 738, "date": "2024-12-02", "merchant": "ASDA", "desc": "ASDA STORES 4766", "amount": 49.59, "cat": "Groceries", "year": 2024, "month": "Dec"},
+{"id": 739, "date": "2024-12-02", "merchant": "Council Tax", "desc": "LBHF COUNCIL TAX", "amount": 144.14, "cat": "Bills", "year": 2024, "month": "Dec"},
+{"id": 740, "date": "2024-12-02", "merchant": "Amazon", "desc": "AMAZON UK RETAIL", "amount": 48.01, "cat": "Shopping", "year": 2024, "month": "Dec"},
+{"id": 741, "date": "2024-12-04", "merchant": "Sky Sports", "desc": "SKY DIGITAL", "amount": 25.99, "cat": "Entertainment", "year": 2024, "month": "Dec"},
+{"id": 742, "date": "2024-12-05", "merchant": "Thames Water", "desc": "THAMES WATER UTIL", "amount": 32.33, "cat": "Bills", "year": 2024, "month": "Dec"},
+{"id": 743, "date": "2024-12-05", "merchant": "British Gas", "desc": "BRITISH GAS SERVICES", "amount": 50.7, "cat": "Bills", "year": 2024, "month": "Dec"},
+{"id": 744, "date": "2024-12-05", "merchant": "BT Broadband", "desc": "BT GROUP PLC", "amount": 40.12, "cat": "Bills", "year": 2024, "month": "Dec"},
+{"id": 745, "date": "2024-12-06", "merchant": "Netflix", "desc": "NETFLIX.COM", "amount": 15.99, "cat": "Entertainment", "year": 2024, "month": "Dec"},
+{"id": 746, "date": "2024-12-07", "merchant": "ASOS", "desc": "ASOS.COM LTD", "amount": 86.67, "cat": "Shopping", "year": 2024, "month": "Dec"},
+{"id": 747, "date": "2024-12-08", "merchant": "Nando's", "desc": "NANDOS RESTAURANT", "amount": 22.39, "cat": "Eating Out", "year": 2024, "month": "Dec"},
+{"id": 748, "date": "2024-12-08", "merchant": "Uber", "desc": "UBER *TRIP", "amount": 11.18, "cat": "Transport", "year": 2024, "month": "Dec"},
+{"id": 749, "date": "2024-12-09", "merchant": "Lidl", "desc": "LIDL GB GMBH", "amount": 66.28, "cat": "Groceries", "year": 2024, "month": "Dec"},
+{"id": 751, "date": "2024-12-10", "merchant": "Argos", "desc": "ARGOS LTD", "amount": 75.66, "cat": "Shopping", "year": 2024, "month": "Dec"},
+{"id": 752, "date": "2024-12-10", "merchant": "TfL", "desc": "TFL TRAVEL CHARGE", "amount": 52.21, "cat": "Transport", "year": 2024, "month": "Dec"},
+{"id": 753, "date": "2024-12-13", "merchant": "Amazon", "desc": "AMAZON UK RETAIL", "amount": 76.7, "cat": "Shopping", "year": 2024, "month": "Dec"},
+{"id": 754, "date": "2024-12-13", "merchant": "Nando's", "desc": "NANDOS RESTAURANT", "amount": 11.32, "cat": "Eating Out", "year": 2024, "month": "Dec"},
+{"id": 755, "date": "2024-12-14", "merchant": "Vanguard ISA", "desc": "VANGUARD ASSET MGMT", "amount": 193.45, "cat": "Investment", "year": 2024, "month": "Dec"},
+{"id": 756, "date": "2024-12-14", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 16.66, "cat": "Transport", "year": 2024, "month": "Dec"},
+{"id": 757, "date": "2024-12-15", "merchant": "Tesco", "desc": "TESCO STORES 3321", "amount": 65.17, "cat": "Groceries", "year": 2024, "month": "Dec"},
+{"id": 758, "date": "2024-12-16", "merchant": "Shell Petrol", "desc": "SHELL PETROL STATION", "amount": 54.79, "cat": "Transport", "year": 2024, "month": "Dec"},
+{"id": 759, "date": "2024-12-17", "merchant": "Nando's", "desc": "NANDOS RESTAURANT", "amount": 25.53, "cat": "Eating Out", "year": 2024, "month": "Dec"},
+{"id": 760, "date": "2024-12-18", "merchant": "EasyJet", "desc": "EASYJET AIRLINE", "amount": 64.01, "cat": "Travel", "year": 2024, "month": "Dec"},
+{"id": 761, "date": "2024-12-23", "merchant": "Lidl", "desc": "LIDL GB GMBH", "amount": 46.32, "cat": "Groceries", "year": 2024, "month": "Dec"},
+{"id": 762, "date": "2024-12-24", "merchant": "National Rail", "desc": "NATIONAL RAIL ENQ", "amount": 19.95, "cat": "Transport", "year": 2024, "month": "Dec"},
+{"id": 764, "date": "2024-12-27", "merchant": "Shell Petrol", "desc": "SHELL PETROL STATION", "amount": 20.7, "cat": "Transport", "year": 2024, "month": "Dec"},
+{"id": 765, "date": "2024-12-28", "merchant": "Nando's", "desc": "NANDOS RESTAURANT", "amount": 30.71, "cat": "Eating Out", "year": 2024, "month": "Dec"}
+];
+var IC   = '#06D6A0';
+
+// Set of excluded transaction IDs (excluded = deselected by user)
+var excludedTxns = {};
+
+function fmt(v) {
+  return '£' + v.toLocaleString('en-GB', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+// ── Category chips ──────────────────────────────────────────────────────────
+var allCats = [];
+RAW.forEach(function(r) { if (allCats.indexOf(r.to) === -1) allCats.push(r.to); });
+allCats.sort();
+var enabledCats = {};
+allCats.forEach(function(c) { enabledCats[c] = true; });
+
+var chipsEl = document.getElementById('chips');
+allCats.forEach(function(cat) {
+  var col = CC[cat] || '#90CAF9';
+  var chip = document.createElement('div');
+  chip.className = 'chip on'; chip.dataset.cat = cat;
+  chip.style.background = col + '22';
+  chip.innerHTML = '<div class="cdot" style="background:' + col + '"></div><span>' + cat + '</span>';
+  chip.addEventListener('click', function() {
+    enabledCats[cat] = !enabledCats[cat];
+    chip.className = 'chip ' + (enabledCats[cat] ? 'on' : 'off');
+    render();
+  });
+  chipsEl.appendChild(chip);
+});
+document.getElementById('btn-all').addEventListener('click', function() {
+  allCats.forEach(function(c) { enabledCats[c] = true; });
+  document.querySelectorAll('.chip').forEach(function(ch) { ch.className = 'chip on'; });
+  render();
+});
+document.getElementById('btn-none').addEventListener('click', function() {
+  allCats.forEach(function(c) { enabledCats[c] = false; });
+  document.querySelectorAll('.chip').forEach(function(ch) { ch.className = 'chip off'; });
+  render();
+});
+
+// ── Year/month dropdowns ────────────────────────────────────────────────────
+var yrs = [];
+RAW.forEach(function(r) { if (yrs.indexOf(r.year) === -1) yrs.push(r.year); });
+yrs.sort();
+var ys = document.getElementById('ys');
+yrs.forEach(function(y) { var o = document.createElement('option'); o.value = y; o.textContent = y; ys.appendChild(o); });
+ys.addEventListener('change', render);
+document.getElementById('ms').addEventListener('change', render);
+
+// ── Transaction drill-down ──────────────────────────────────────────────────
+var activeCat = null, activeYear = 'all', activeMonth = 'all';
+var visibleTxnIds = [];  // IDs currently shown in the table
+
+function showTxns(cat) {
+  activeCat = cat;
+  document.getElementById('txn-search').value = '';
+  filterAndRenderTxns();
+  var panel = document.getElementById('txn-panel');
+  panel.style.display = 'block';
+  panel.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+document.getElementById('txn-close').addEventListener('click', function() {
+  document.getElementById('txn-panel').style.display = 'none';
+  activeCat = null;
+});
+
+document.getElementById('txn-search').addEventListener('input', filterAndRenderTxns);
+
+// Select/deselect all visible rows
+document.getElementById('txn-sel-all').addEventListener('click', function() {
+  visibleTxnIds.forEach(function(id) { delete excludedTxns[id]; });
+  filterAndRenderTxns();
+  render();
+});
+document.getElementById('txn-sel-none').addEventListener('click', function() {
+  visibleTxnIds.forEach(function(id) { excludedTxns[id] = true; });
+  filterAndRenderTxns();
+  render();
+});
+
+// Header checkbox: select/deselect all visible
+document.getElementById('chk-all').addEventListener('change', function() {
+  if (this.checked) {
+    visibleTxnIds.forEach(function(id) { delete excludedTxns[id]; });
+  } else {
+    visibleTxnIds.forEach(function(id) { excludedTxns[id] = true; });
+  }
+  filterAndRenderTxns();
+  render();
+});
+
+function filterAndRenderTxns() {
+  var search = document.getElementById('txn-search').value.toLowerCase();
+  var rows = TXNS.filter(function(t) {
+    return t.cat === activeCat
+      && (activeYear === 'all' || String(t.year) === String(activeYear))
+      && (activeMonth === 'all' || t.month === activeMonth)
+      && (!search || t.merchant.toLowerCase().indexOf(search) > -1 || t.desc.toLowerCase().indexOf(search) > -1);
+  });
+  rows.sort(function(a,b) { return a.date < b.date ? 1 : -1; });
+
+  visibleTxnIds = rows.map(function(t) { return t.id; });
+
+  var col = CC[activeCat] || '#90CAF9';
+  document.getElementById('txn-title').innerHTML = activeCat + ' <span>' + rows.length + ' transactions</span>';
+
+  var allSelected = rows.every(function(t) { return !excludedTxns[t.id]; });
+  var noneSelected = rows.every(function(t) { return excludedTxns[t.id]; });
+  var chkAll = document.getElementById('chk-all');
+  chkAll.checked = allSelected;
+  chkAll.indeterminate = !allSelected && !noneSelected;
+
+  var tbody = document.getElementById('txn-body');
+  tbody.innerHTML = '';
+  rows.forEach(function(t) {
+    var enabled = !excludedTxns[t.id];
+    var tr = document.createElement('tr');
+    tr.style.opacity = enabled ? '1' : '0.38';
+    var chkTd = document.createElement('td');
+    chkTd.style.textAlign = 'center';
+    var chk = document.createElement('input');
+    chk.type = 'checkbox';
+    chk.checked = enabled;
+    chk.style.cursor = 'pointer';
+    (function(txn, row) {
+      chk.addEventListener('change', function() {
+        if (this.checked) { delete excludedTxns[txn.id]; row.style.opacity = '1'; }
+        else              { excludedTxns[txn.id] = true;  row.style.opacity = '0.38'; }
+        // update header checkbox state
+        var allSel = visibleTxnIds.every(function(id) { return !excludedTxns[id]; });
+        var noneSel = visibleTxnIds.every(function(id) { return excludedTxns[id]; });
+        chkAll.checked = allSel;
+        chkAll.indeterminate = !allSel && !noneSel;
+        updateTxnFooter();
+        render();
+      });
+    })(t, tr);
+    chkTd.appendChild(chk);
+    tr.appendChild(chkTd);
+    function makeTd(cls, text) {
+      var td = document.createElement('td');
+      if (cls) td.className = cls;
+      td.textContent = text;
+      return td;
+    }
+    tr.appendChild(makeTd('date', t.date));
+    tr.appendChild(makeTd('merchant', t.merchant || '-'));
+    tr.appendChild(makeTd('desc', t.desc || '-'));
+    tr.appendChild(makeTd('num', fmt(t.amount)));
+    tbody.appendChild(tr);
+  });
+
+  updateTxnFooter();
+}
+
+function updateTxnFooter() {
+  var rows = TXNS.filter(function(t) {
+    return t.cat === activeCat
+      && (activeYear === 'all' || String(t.year) === String(activeYear))
+      && (activeMonth === 'all' || t.month === activeMonth);
+  });
+  var selectedRows = rows.filter(function(t) { return !excludedTxns[t.id]; });
+  var total = selectedRows.reduce(function(s,t){return s+t.amount;}, 0);
+  document.getElementById('txn-count').textContent = selectedRows.length + ' / ' + rows.length;
+  document.getElementById('txn-total').textContent = fmt(total);
+  var hasExcluded = Object.keys(excludedTxns).length > 0;
+  document.getElementById('txn-excl-msg').style.display = hasExcluded ? 'block' : 'none';
+}
+
+// ── Main render ─────────────────────────────────────────────────────────────
+function render() {
+  activeYear  = ys.value;
+  activeMonth = document.getElementById('ms').value;
+  document.getElementById('pl').textContent = (activeYear === 'all' ? 'All Years' : activeYear) + (activeMonth === 'all' ? '' : ', ' + activeMonth);
+
+  // Build category map from TXNS directly (respects per-transaction exclusions)
+  var cm = {}, ip = {};
+  TXNS.forEach(function(t) {
+    if (!enabledCats[t.cat]) return;
+    if (excludedTxns[t.id]) return;
+    if (activeYear !== 'all' && String(t.year) !== String(activeYear)) return;
+    if (activeMonth !== 'all' && t.month !== activeMonth) return;
+    cm[t.cat] = (cm[t.cat] || 0) + t.amount;
+  });
+
+  // Income comes from RAW (period totals, unaffected by txn exclusions)
+  var fPeriod = RAW.filter(function(r) {
+    return (activeYear === 'all' || String(r.year) === String(activeYear)) && (activeMonth === 'all' || r.month === activeMonth);
+  });
+  fPeriod.forEach(function(r) { var k = r.year + '-' + r.month; if (!ip[k]) ip[k] = r.income_ref; });
+  var ti = Object.values(ip).reduce(function(a,b){return a+b;}, 0);
+  var te = Object.values(cm).reduce(function(a,b){return a+b;}, 0);
+  var net = ti - te;
+  document.getElementById('si').textContent = fmt(ti);
+  document.getElementById('se').textContent = fmt(te);
+  var sn = document.getElementById('sn');
+  sn.textContent = (net >= 0 ? '+' : '') + fmt(Math.abs(net));
+  sn.className = 'sv ' + (net >= 0 ? 'pv' : 'nv');
+  document.getElementById('nc').className = 'sc ' + (net >= 0 ? 'np' : 'nn');
+  document.getElementById('scov').textContent = ti > 0 ? (te/ti*100).toFixed(1) + '%' : '-';
+  draw(cm, ti, te);
+
+  var leg = document.getElementById('leg');
+  leg.innerHTML = '';
+  var ent = Object.entries(cm).filter(function(e) { return e[1] > 0; }).sort(function(a,b) { return b[1]-a[1]; });
+  ent.forEach(function(e) {
+    var cat = e[0];
+    var div = document.createElement('div'); div.className = 'li';
+    var dot = document.createElement('div'); dot.className = 'ld'; dot.style.background = CC[cat] || '#90CAF9';
+    var sp  = document.createElement('span'); sp.textContent = cat;
+    div.appendChild(dot); div.appendChild(sp); leg.appendChild(div);
+  });
+  if (activeCat) filterAndRenderTxns();
+}
+
+// ── SVG helpers ─────────────────────────────────────────────────────────────
+function mkEl(tag, attrs) {
+  var el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  Object.keys(attrs).forEach(function(k) { el.setAttribute(k, attrs[k]); });
+  return el;
+}
+
+function draw(cm, ti, te) {
+  var svg = document.getElementById('sg');
+  svg.innerHTML = '';
+  var ent = Object.entries(cm).filter(function(e) { return e[1] > 0; }).sort(function(a,b) { return b[1]-a[1]; });
+  if (!ent.length) {
+    svg.setAttribute('width', '100%'); svg.setAttribute('height', '200');
+    var t = mkEl('text', {x:'50%', y:'100', 'text-anchor':'middle', fill:'#90CAF9', 'font-size':'18', 'font-family':'Arial'});
+    t.textContent = 'No data for selected period / categories';
+    svg.appendChild(t);
+    return;
+  }
+
+  var NODE_MIN_H = 60, GAP = 12, PAD = 40;
+  var tot = ent.reduce(function(s,e){return s+e[1];}, 0);
+  var rawH = ent.map(function(e) { return Math.max(NODE_MIN_H, (e[1]/tot) * Math.max(NODE_MIN_H*ent.length, 600)); });
+  var totalCatH = rawH.reduce(function(a,b){return a+b;},0) + GAP*(ent.length-1);
+  var H = totalCatH + PAD*2;
+  var W = Math.max(600, svg.parentElement.clientWidth - 48);
+  svg.setAttribute('width', W); svg.setAttribute('height', H);
+  svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+
+  var nW=28, left=130, right=W-160, usH=H-PAD*2;
+  var iH = Math.min(usH*0.88, totalCatH), iY = PAD + (usH-iH)/2;
+  var cY = PAD + (usH-totalCatH)/2;
+
+  var nodes = ent.map(function(e, i) {
+    var n = {cat:e[0], val:e[1], y:cY, h:rawH[i]};
+    cY += rawH[i] + GAP;
+    return n;
+  });
+
+  var tip = document.getElementById('tip');
+  function showTip(e, html) { tip.innerHTML = html; tip.style.display = 'block'; moveTip(e); }
+  function moveTip(e) { tip.style.left = (e.clientX+14)+'px'; tip.style.top = (e.clientY-10)+'px'; }
+  function hideTip() { tip.style.display = 'none'; }
+
+  // Flows
+  var incOffset = 0;
+  nodes.forEach(function(n) {
+    var col = CC[n.cat] || '#90CAF9';
+    var frac = n.val / (ti || tot);
+    var fH = Math.max(3, frac * iH);
+    var srcY = iY + incOffset;
+    incOffset += fH;
+    var x0=left+nW, x1=right, mx=(x0+x1)/2;
+    var d = 'M'+x0+','+srcY+' C'+mx+','+srcY+' '+mx+','+n.y+' '+x1+','+n.y
+          + ' L'+x1+','+(n.y+n.h)+' C'+mx+','+(n.y+n.h)+' '+mx+','+(srcY+fH)+' '+x0+','+(srcY+fH)+' Z';
+    var path = mkEl('path', {d:d, fill:col, opacity:'0.4'});
+    path.style.cursor = 'pointer'; path.style.transition = 'opacity .2s';
+    (function(node) {
+      path.addEventListener('mouseenter', function(e) {
+        path.setAttribute('opacity','0.72');
+        showTip(e, '<strong>'+node.cat+'</strong><span>'+fmt(node.val)+'<br>'+(node.val/(ti||1)*100).toFixed(1)+'% of income<br>'+(node.val/(tot||1)*100).toFixed(1)+'% of spending<br><em style="color:#4CC9F0">Click to see transactions</em></span>');
+      });
+      path.addEventListener('mousemove', moveTip);
+      path.addEventListener('mouseleave', function() { path.setAttribute('opacity','0.4'); hideTip(); });
+      path.addEventListener('click', function() { hideTip(); showTxns(node.cat); });
+    })(n);
+    svg.appendChild(path);
+  });
+
+  // Income node
+  svg.appendChild(mkEl('rect', {x:left, y:iY, width:nW, height:iH, rx:6, fill:IC}));
+  function addTxt(x, y, txt, fill, size, bold, anchor) {
+    var t = mkEl('text', {x:x, y:y, 'text-anchor':anchor||'end', 'dominant-baseline':'middle', fill:fill, 'font-size':size, 'font-weight':bold?'bold':'normal', 'font-family':'Arial'});
+    t.textContent = txt; svg.appendChild(t);
+  }
+  addTxt(left-10, iY+iH/2-10, 'Income', '#06D6A0', 14, true, 'end');
+  addTxt(left-10, iY+iH/2+10, fmt(ti), '#90CAF9', 11, false, 'end');
+
+  // Category nodes
+  nodes.forEach(function(n) {
+    var col = CC[n.cat] || '#90CAF9';
+    var r = mkEl('rect', {x:right, y:n.y, width:nW, height:n.h, rx:4, fill:col});
+    r.style.cursor = 'pointer';
+    (function(node) {
+      r.addEventListener('mouseenter', function(e) {
+        showTip(e, '<strong>'+node.cat+'</strong><span>'+fmt(node.val)+'<br>'+(node.val/(tot||1)*100).toFixed(1)+'% of spending<br><em style="color:#4CC9F0">Click to see transactions</em></span>');
+      });
+      r.addEventListener('mousemove', moveTip);
+      r.addEventListener('mouseleave', hideTip);
+      r.addEventListener('click', function() { hideTip(); showTxns(node.cat); });
+    })(n);
+    svg.appendChild(r);
+    var lbl = mkEl('text', {x:right+nW+10, y:n.y+n.h/2-8, 'text-anchor':'start', 'dominant-baseline':'middle', fill:'#e0e0e0', 'font-size':'12', 'font-weight':'bold', 'font-family':'Arial'});
+    lbl.style.cursor = 'pointer';
+    lbl.textContent = n.cat;
+    (function(node) { lbl.addEventListener('click', function() { showTxns(node.cat); }); })(n);
+    svg.appendChild(lbl);
+    var amt = mkEl('text', {x:right+nW+10, y:n.y+n.h/2+9, 'text-anchor':'start', 'dominant-baseline':'middle', fill:'#90CAF9', 'font-size':'11', 'font-family':'Arial'});
+    amt.textContent = fmt(n.val);
+    svg.appendChild(amt);
+  });
+}
+
+render();
+window.addEventListener('resize', render);
+</script>
+</body>
+</html>
